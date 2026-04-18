@@ -48,7 +48,24 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
     redirect('/taskboard');
   }
 
-  const adminClient = createAdminClient();
+  let adminClient;
+  try {
+    adminClient = createAdminClient();
+  } catch (error) {
+    return (
+      <section className="view active">
+        <div className="section-header">
+          <div>
+            <h2 className="section-title">User Progress</h2>
+            <p className="section-subtitle">{error instanceof Error ? error.message : 'Missing admin configuration.'}</p>
+          </div>
+          <Link href="/admin/users" className="btn-secondary btn-sm">
+            Back To Users
+          </Link>
+        </div>
+      </section>
+    );
+  }
   const userId = params.id;
 
   const { data: userProfile, error: userError } = await adminClient
@@ -89,6 +106,7 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
     tasksError?.message?.includes('user_id') || entriesError?.message?.includes('user_id')
       ? 'Per-user progress requires `user_id` columns on `tasks` and `time_entries`.'
       : '';
+  const queryErrorMessage = tasksError?.message || entriesError?.message || scopeErrorMessage;
 
   const tasks = (tasksData || []) as TaskProgressRow[];
   const entries = (entriesData || []) as TimeEntryProgressRow[];
@@ -105,7 +123,7 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
             Progress: {userProfile.first_name} {userProfile.last_name}
           </h2>
           <p className="section-subtitle">
-            {userProfile.email} • {userProfile.job_role}
+            {userProfile.email} | {userProfile.job_role}
           </p>
         </div>
         <Link href="/admin/users" className="btn-secondary btn-sm">
@@ -113,9 +131,9 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
         </Link>
       </div>
 
-      {scopeErrorMessage ? (
+      {queryErrorMessage ? (
         <div className="card">
-          <p className="text-muted">{scopeErrorMessage}</p>
+          <p className="text-muted">{queryErrorMessage}</p>
         </div>
       ) : null}
 

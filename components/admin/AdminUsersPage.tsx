@@ -16,16 +16,21 @@ export function AdminUsersPage() {
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
-    const response = await fetch('/api/admin/users', { method: 'GET' });
-    const payload = (await response.json()) as { error?: string; users?: UserListItem[] };
-    setIsLoadingUsers(false);
+    try {
+      const response = await fetch('/api/admin/users', { method: 'GET' });
+      const payload = (await response.json()) as { error?: string; users?: UserListItem[] };
 
-    if (!response.ok || !payload.users) {
-      toast.error(payload.error || 'Failed to fetch users.');
-      return;
+      if (!response.ok || !payload.users) {
+        toast.error(payload.error || 'Failed to fetch users.');
+        return;
+      }
+
+      setUsers(payload.users);
+    } catch {
+      toast.error('Network error while fetching users.');
+    } finally {
+      setIsLoadingUsers(false);
     }
-
-    setUsers(payload.users);
   };
 
   useEffect(() => {
@@ -50,18 +55,22 @@ export function AdminUsersPage() {
     const confirmed = window.confirm(`Remove user "${user.first_name} ${user.last_name}"?`);
     if (!confirmed) return;
 
-    const response = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
-      method: 'DELETE',
-    });
-    const payload = (await response.json()) as { error?: string };
+    try {
+      const response = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
+        method: 'DELETE',
+      });
+      const payload = (await response.json()) as { error?: string };
 
-    if (!response.ok) {
-      toast.error(payload.error || 'Failed to remove user.');
-      return;
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to remove user.');
+        return;
+      }
+
+      toast.success('User removed successfully.');
+      void loadUsers();
+    } catch {
+      toast.error('Network error while removing user.');
     }
-
-    toast.success('User removed successfully.');
-    void loadUsers();
   };
 
   const onViewProgress = (user: UserListItem) => {

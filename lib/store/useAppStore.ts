@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { mapEntryFromDB, mapEntryToDB, mapTaskFromDB, mapTaskToDB } from '@/lib/mappers';
+import { mapEntryFromDB, mapEntryToDBWithUser, mapTaskFromDB, mapTaskToDBWithUser } from '@/lib/mappers';
 import { supabase } from '@/lib/supabase/client';
 import { normalizeNoteFields } from '@/lib/utils/noteIcons';
 import type {
@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 type AppStore = AppState & {
+  currentUserId: string | null;
   loadAllData: () => Promise<boolean>;
   setSyncStatus: (status: SyncStatus) => void;
   setDataLoaded: (loaded: boolean) => void;
@@ -100,6 +101,7 @@ async function syncSettings(get: () => AppStore): Promise<void> {
 export const useAppStore = create<AppStore>((set, get) => ({
   tasks: [],
   timeEntries: [],
+  currentUserId: null,
   projects: DEFAULT_PROJECTS,
   hourTypes: DEFAULT_HOUR_TYPES,
   noteFields: DEFAULT_NOTE_FIELDS,
@@ -118,9 +120,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   loadAllData: async () => {
     try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        throw authError || new Error('Missing authenticated user');
+      }
+
+      const currentUserId = authData.user.id;
+
       const [tasksRes, entriesRes, settingsRes] = await Promise.all([
-        supabase.from('tasks').select('*').order('created_date', { ascending: false }),
-        supabase.from('time_entries').select('*').order('date', { ascending: false }),
+        supabase.from('tasks').select('*').eq('user_id', currentUserId).order('created_date', { ascending: false }),
+        supabase.from('time_entries').select('*').eq('user_id', currentUserId).order('date', { ascending: false }),
         supabase.from('settings').select('*').eq('id', 1).single(),
       ]);
 
@@ -147,6 +156,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set({
         tasks,
         timeEntries,
+        currentUserId,
         settings: nextSettings,
         projects,
         hourTypes,
@@ -174,7 +184,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const { error } = await supabase.from('tasks').upsert(mapTaskToDB(task));
+      const payload = mapTaskToDBWithUser(task, get().currentUserId);
+      const { error } = await supabase.from('tasks').upsert(payload);
       if (error) {
         console.error('Task upsert error:', error);
         get().setSyncStatus('error');
@@ -192,8 +203,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const { error: taskErr } = await supabase.from('tasks').delete().eq('id', taskId);
-      const { error: entryErr } = await supabase.from('time_entries').delete().eq('task_id', taskId);
+      const currentUserId = get().currentUserId;
+      let taskDeleteQuery = supabase.from('tasks').delete().eq('id', taskId);
+      let entryDeleteQuery = supabase.from('time_entries').delete().eq('task_id', taskId);
+      if (currentUserId) {
+        taskDeleteQuery = taskDeleteQuery.eq('user_id', currentUserId);
+        entryDeleteQuery = entryDeleteQuery.eq('user_id', currentUserId);
+      }
+
+      const { error: taskErr } = await taskDeleteQuery;
+      const { error: entryErr } = await entryDeleteQuery;
       if (taskErr || entryErr) {
         console.error('Task delete error:', taskErr || entryErr);
         get().setSyncStatus('error');
@@ -214,7 +233,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const { error } = await supabase.from('time_entries').upsert(mapEntryToDB(entry));
+      const payload = mapEntryToDBWithUser(entry, get().currentUserId);
+      const { error } = await supabase.from('time_entries').upsert(payload);
       if (error) {
         console.error('Entry upsert error:', error);
         get().setSyncStatus('error');

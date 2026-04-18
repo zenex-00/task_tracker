@@ -79,6 +79,7 @@ export interface AppState {
 
 export interface TaskRow {
   id: string;
+  user_id?: string | null;
   name: string;
   project: string | null;
   hours_spent: number | string | null;
@@ -91,6 +92,7 @@ export interface TaskRow {
 
 export interface EntryRow {
   id: string;
+  user_id?: string | null;
   date: string;
   hours: number | string | null;
   task_id: string | null;

@@ -67,7 +67,24 @@ export default async function AdminTeamPage({
     redirect('/taskboard');
   }
 
-  const adminClient = createAdminClient();
+  let adminClient;
+  try {
+    adminClient = createAdminClient();
+  } catch (error) {
+    return (
+      <section className="view active">
+        <div className="section-header">
+          <div>
+            <h2 className="section-title">Team Progress</h2>
+            <p className="section-subtitle">{error instanceof Error ? error.message : 'Missing admin configuration.'}</p>
+          </div>
+          <Link href="/admin/users" className="btn-secondary btn-sm">
+            Users
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   const { data: taskRows, error: taskError } = await adminClient
     .from('tasks')

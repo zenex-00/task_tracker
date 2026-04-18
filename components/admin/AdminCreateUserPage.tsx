@@ -38,8 +38,6 @@ export function AdminCreateUserPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     const finalRole = form.role === 'Other' ? customRole.trim() : form.role;
 
     if (!finalRole) {
@@ -47,22 +45,29 @@ export function AdminCreateUserPage() {
       return;
     }
 
-    const response = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, role: finalRole }),
-    });
-    const payload = (await response.json()) as { error?: string };
-    setIsSubmitting(false);
+    setIsSubmitting(true);
 
-    if (!response.ok) {
-      toast.error(payload.error || 'Failed to create user.');
-      return;
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, role: finalRole }),
+      });
+      const payload = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to create user.');
+        return;
+      }
+
+      toast.success('User created successfully.');
+      router.push('/admin/users');
+      router.refresh();
+    } catch {
+      toast.error('Network error while creating user.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    toast.success('User created successfully.');
-    router.push('/admin/users');
-    router.refresh();
   };
 
   return (

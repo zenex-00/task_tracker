@@ -14,7 +14,18 @@ type CreateUserBody = {
 };
 
 async function verifyAdmin() {
-  const supabase = createClient();
+  let supabase;
+  try {
+    supabase = createClient();
+  } catch (error) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { error: error instanceof Error ? error.message : 'Missing Supabase configuration.' },
+        { status: 500 },
+      ),
+    };
+  }
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
   if (userError || !userData.user) {

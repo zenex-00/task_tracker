@@ -12,6 +12,7 @@ export function TasksTable() {
   const advanceTaskStatus = useAppStore((s) => s.advanceTaskStatus);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('All');
+  const statusOrder = ['Not Started', 'In Progress', 'Completed'] as const;
 
   const filtered = useMemo(() => {
     let list = [...tasks].sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime());
@@ -84,8 +85,10 @@ export function TasksTable() {
                       <button
                         type="button"
                         onClick={() => {
+                          const currentIdx = statusOrder.indexOf(task.status);
+                          const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length];
                           advanceTaskStatus(task.id);
-                          toast(`Task moved to: ${task.status}`);
+                          toast(`Task moved to: ${nextStatus}`);
                         }}
                         style={{
                           background: 'var(--accent-soft)',

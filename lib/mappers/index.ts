@@ -32,6 +32,13 @@ export function mapTaskToDB(task: Task): TaskRow {
   };
 }
 
+export function mapTaskToDBWithUser(task: Task, userId: string | null): TaskRow {
+  return {
+    ...mapTaskToDB(task),
+    user_id: userId,
+  };
+}
+
 export function mapEntryFromDB(row: EntryRow): TimeEntry {
   return {
     id: row.id,
@@ -53,5 +60,12 @@ export function mapEntryToDB(entry: TimeEntry): EntryRow {
     billable: entry.billable,
     project: entry.project,
     description: entry.description,
+  };
+}
+
+export function mapEntryToDBWithUser(entry: TimeEntry, userId: string | null): EntryRow {
+  return {
+    ...mapEntryToDB(entry),
+    user_id: userId,
   };
 }
