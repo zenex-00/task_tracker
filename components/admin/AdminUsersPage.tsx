@@ -14,7 +14,6 @@ interface CreateUserPayload {
   firstName: string;
   lastName: string;
   role: TeamRole;
-  isAdmin: boolean;
 }
 
 const initialForm: CreateUserPayload = {
@@ -23,7 +22,6 @@ const initialForm: CreateUserPayload = {
   firstName: '',
   lastName: '',
   role: 'Full Stack Developer',
-  isAdmin: false,
 };
 
 export function AdminUsersPage() {
@@ -153,15 +151,6 @@ export function AdminUsersPage() {
               ))}
             </select>
           </div>
-
-          <label className="admin-checkbox">
-            <input
-              type="checkbox"
-              checked={form.isAdmin}
-              onChange={(event) => setForm((prev) => ({ ...prev, isAdmin: event.target.checked }))}
-            />
-            <span>Grant Admin Access</span>
-          </label>
 
           <button className="btn-primary" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating User...' : 'Create User'}

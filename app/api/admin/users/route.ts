@@ -11,7 +11,6 @@ type CreateUserBody = {
   firstName?: string;
   lastName?: string;
   role?: TeamRole;
-  isAdmin?: boolean;
 };
 
 async function verifyAdmin() {
@@ -72,7 +71,8 @@ export async function POST(request: Request) {
   const firstName = body.firstName?.trim() || '';
   const lastName = body.lastName?.trim() || '';
   const role = body.role;
-  const isAdmin = Boolean(body.isAdmin);
+  // New users are always created as non-admin users.
+  const isAdmin = false;
 
   if (!email || !password || !firstName || !lastName || !role) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
@@ -104,7 +104,6 @@ export async function POST(request: Request) {
       first_name: firstName,
       last_name: lastName,
       job_role: role,
-      is_admin: isAdmin,
     },
   });
 
