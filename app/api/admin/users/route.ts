@@ -18,7 +18,10 @@ async function verifyAdmin() {
   const { data: userData, error: userError } = await supabase.auth.getUser();
 
   if (userError || !userData.user) {
-    return { ok: false as const, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    };
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -31,7 +34,7 @@ async function verifyAdmin() {
     return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
-  return { ok: true as const };
+  return { ok: true as const, userId: userData.user.id };
 }
 
 export async function GET() {
@@ -40,8 +43,17 @@ export async function GET() {
     return guard.response;
   }
 
-  const supabase = createClient();
-  const { data, error } = await supabase
+  let adminClient;
+  try {
+    adminClient = createAdminClient();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Missing admin configuration.' },
+      { status: 500 },
+    );
+  }
+
+  const { data, error } = await adminClient
     .from('user_profiles')
     .select('id, email, first_name, last_name, job_role, is_admin, created_at')
     .order('created_at', { ascending: false });
@@ -126,4 +138,40 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ success: true }, { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  const guard = await verifyAdmin();
+  if (!guard.ok) {
+    return guard.response;
+  }
+
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('id') || '';
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User id is required.' }, { status: 400 });
+  }
+
+  if (userId === guard.userId) {
+    return NextResponse.json({ error: 'You cannot remove your own account.' }, { status: 400 });
+  }
+
+  let adminClient;
+  try {
+    adminClient = createAdminClient();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Missing admin configuration.' },
+      { status: 500 },
+    );
+  }
+
+  const { error } = await adminClient.auth.admin.deleteUser(userId);
+
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to remove user.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

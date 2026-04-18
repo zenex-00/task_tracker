@@ -188,6 +188,19 @@ button { font-family: inherit; cursor: pointer; border: none; transition: var(--
     border: 1px solid rgba(145, 164, 198, 0.28);
 }
 .btn-ghost:hover { color: var(--accent); border-color: rgba(47, 94, 246, 0.24); }
+.btn-danger-soft {
+    border-radius: 10px;
+    background: rgba(221, 59, 77, 0.12);
+    color: var(--danger);
+    border: 1px solid rgba(221, 59, 77, 0.24);
+    font-weight: 600;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+}
+.btn-danger-soft:hover {
+    background: var(--danger);
+    color: #fff;
+}
 .btn-large { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-icon { width: 16px; height: 16px; display: inline-flex; }
 .btn-icon svg { width: 16px; height: 16px; }

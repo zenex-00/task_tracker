@@ -79,6 +79,24 @@ export function AdminUsersPage() {
     void loadUsers();
   };
 
+  const onRemoveUser = async (user: UserListItem) => {
+    const confirmed = window.confirm(`Remove user "${user.first_name} ${user.last_name}"?`);
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/admin/users?id=${encodeURIComponent(user.id)}`, {
+      method: 'DELETE',
+    });
+    const payload = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      toast.error(payload.error || 'Failed to remove user.');
+      return;
+    }
+
+    toast.success('User removed successfully.');
+    void loadUsers();
+  };
+
   return (
     <div className="dashboard-grid admin-grid">
       <section className="card admin-card">
@@ -177,6 +195,7 @@ export function AdminUsersPage() {
                   <th>Email</th>
                   <th>Role</th>
                   <th>Access</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,11 +206,16 @@ export function AdminUsersPage() {
                       <td>{user.email}</td>
                       <td>{user.job_role}</td>
                       <td>{user.is_admin ? 'Admin' : 'User'}</td>
+                      <td>
+                        <button type="button" className="btn-danger-soft" onClick={() => void onRemoveUser(user)}>
+                          Remove
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4}>No users found.</td>
+                    <td colSpan={5}>No users found.</td>
                   </tr>
                 )}
               </tbody>
