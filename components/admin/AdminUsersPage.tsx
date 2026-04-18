@@ -1,37 +1,18 @@
 'use client';
 
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-import { TEAM_ROLES } from '@/lib/auth/roles';
-import type { TeamRole, UserProfile } from '@/types';
+import type { UserProfile } from '@/types';
 
 interface UserListItem extends UserProfile {}
-interface CreateUserPayload {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  role: TeamRole;
-}
-
-const initialForm: CreateUserPayload = {
-  email: '',
-  password: '',
-  firstName: '',
-  lastName: '',
-  role: 'Full Stack Developer',
-};
 
 export function AdminUsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [form, setForm] = useState<CreateUserPayload>(initialForm);
-
-  const userCount = useMemo(() => users.length, [users]);
+  const [search, setSearch] = useState('');
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
@@ -51,34 +32,19 @@ export function AdminUsersPage() {
     void loadUsers();
   }, []);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting) return;
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return users;
 
-    if (form.password.length < 8) {
-      toast.error('Password must be at least 8 characters long.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const response = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+    return users.filter((user) => {
+      const fullName = `${user.first_name} ${user.last_name}`.toLowerCase();
+      return fullName.includes(query) || user.email.toLowerCase().includes(query) || user.job_role.toLowerCase().includes(query);
     });
-    const payload = (await response.json()) as { error?: string };
-    setIsSubmitting(false);
+  }, [users, search]);
 
-    if (!response.ok) {
-      toast.error(payload.error || 'Failed to create user.');
-      return;
-    }
-
-    toast.success('User created successfully.');
-    setForm(initialForm);
-    void loadUsers();
-  };
+  const totalUsers = users.length;
+  const totalAdmins = users.filter((user) => user.is_admin).length;
+  const totalMembers = totalUsers - totalAdmins;
 
   const onRemoveUser = async (user: UserListItem) => {
     const confirmed = window.confirm(`Remove user "${user.first_name} ${user.last_name}"?`);
@@ -103,89 +69,46 @@ export function AdminUsersPage() {
   };
 
   return (
-    <div className="dashboard-grid admin-grid">
-      <section className="card admin-card">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">Create User</h2>
-            <p className="section-subtitle">Create internal users with role and password.</p>
-          </div>
+    <section className="view active">
+      <div className="section-header">
+        <div>
+          <h2 className="section-title">Users</h2>
+          <p className="section-subtitle">Full team directory. Open any user to see detailed progress.</p>
         </div>
+        <button type="button" className="btn-primary" onClick={() => router.push('/admin/users/create')}>
+          Create User
+        </button>
+      </div>
 
-        <form className="admin-user-form" onSubmit={onSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="first-name">First Name</label>
-              <input
-                id="first-name"
-                type="text"
-                value={form.firstName}
-                onChange={(event) => setForm((prev) => ({ ...prev, firstName: event.target.value }))}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="last-name">Last Name</label>
-              <input
-                id="last-name"
-                type="text"
-                value={form.lastName}
-                onChange={(event) => setForm((prev) => ({ ...prev, lastName: event.target.value }))}
-                required
-              />
-            </div>
-          </div>
+      <div className="metric-row progress-kpis admin-users-kpis">
+        <article className="metric-card">
+          <span className="mc-value">{totalUsers}</span>
+          <span className="mc-label">Total Users</span>
+        </article>
+        <article className="metric-card">
+          <span className="mc-value">{totalMembers}</span>
+          <span className="mc-label">Members</span>
+        </article>
+        <article className="metric-card">
+          <span className="mc-value">{totalAdmins}</span>
+          <span className="mc-label">Admins</span>
+        </article>
+        <article className="metric-card">
+          <span className="mc-value">{filteredUsers.length}</span>
+          <span className="mc-label">Filtered</span>
+        </article>
+      </div>
 
-          <div className="form-group">
-            <label htmlFor="user-email">Email</label>
+      <section className="card admin-users-full-card">
+        <div className="table-header admin-users-toolbar">
+          <h2>Team Members</h2>
+          <div className="filters">
             <input
-              id="user-email"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-              placeholder="new.user@company.com"
-              required
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name, email, or role..."
             />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="user-password">Password</label>
-            <input
-              id="user-password"
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-              minLength={8}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="user-role">Role</label>
-            <select
-              id="user-role"
-              value={form.role}
-              onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value as TeamRole }))}
-            >
-              {TEAM_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button className="btn-primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating User...' : 'Create User'}
-          </button>
-        </form>
-      </section>
-
-      <section className="card admin-card">
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">Users</h2>
-            <p className="section-subtitle">{userCount} users in the system. Click any user to view progress.</p>
           </div>
         </div>
 
@@ -204,8 +127,8 @@ export function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.length ? (
-                  users.map((user) => (
+                {filteredUsers.length ? (
+                  filteredUsers.map((user) => (
                     <tr key={user.id} onClick={() => onViewProgress(user)} style={{ cursor: 'pointer' }}>
                       <td>{`${user.first_name} ${user.last_name}`}</td>
                       <td>{user.email}</td>
@@ -239,7 +162,7 @@ export function AdminUsersPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5}>No users found.</td>
+                    <td colSpan={5}>No users found for the current filter.</td>
                   </tr>
                 )}
               </tbody>
@@ -247,6 +170,6 @@ export function AdminUsersPage() {
           </div>
         )}
       </section>
-    </div>
+    </section>
   );
 }

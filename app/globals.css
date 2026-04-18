@@ -547,10 +547,26 @@ tr:last-child td { border-bottom: 0; }
 .admin-grid { grid-template-columns: 1fr; }
 .admin-card { overflow: hidden; }
 .admin-user-form { max-width: 680px; }
+.admin-user-form-wide { max-width: 100%; }
 .admin-actions {
     display: flex;
     gap: 8px;
     align-items: center;
+}
+.admin-users-kpis {
+    margin-bottom: 14px;
+}
+.admin-users-full-card {
+    min-height: 62vh;
+}
+.admin-users-toolbar {
+    margin-bottom: 10px;
+}
+.admin-users-toolbar .filters {
+    min-width: min(460px, 100%);
+}
+.admin-create-card {
+    max-width: 920px;
 }
 .admin-checkbox {
     display: inline-flex;
@@ -618,4 +634,5 @@ tr:last-child td { border-bottom: 0; }
     .user-badge { min-width: 100%; align-items: flex-start; }
     .admin-actions { flex-direction: column; align-items: flex-start; }
     .progress-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-users-toolbar .filters { min-width: 0; width: 100%; }
 }
