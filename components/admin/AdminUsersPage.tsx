@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { TEAM_ROLES } from '@/lib/auth/roles';
@@ -25,6 +26,7 @@ const initialForm: CreateUserPayload = {
 };
 
 export function AdminUsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,6 +97,10 @@ export function AdminUsersPage() {
 
     toast.success('User removed successfully.');
     void loadUsers();
+  };
+
+  const onViewProgress = (user: UserListItem) => {
+    router.push(`/admin/users/${user.id}/progress`);
   };
 
   return (
@@ -207,9 +213,14 @@ export function AdminUsersPage() {
                       <td>{user.job_role}</td>
                       <td>{user.is_admin ? 'Admin' : 'User'}</td>
                       <td>
-                        <button type="button" className="btn-danger-soft" onClick={() => void onRemoveUser(user)}>
-                          Remove
-                        </button>
+                        <div className="admin-actions">
+                          <button type="button" className="btn-secondary btn-sm" onClick={() => onViewProgress(user)}>
+                            View Progress
+                          </button>
+                          <button type="button" className="btn-danger-soft" onClick={() => void onRemoveUser(user)}>
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

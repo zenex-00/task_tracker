@@ -547,6 +547,11 @@ tr:last-child td { border-bottom: 0; }
 .admin-grid { grid-template-columns: 1fr; }
 .admin-card { overflow: hidden; }
 .admin-user-form { max-width: 680px; }
+.admin-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
 .admin-checkbox {
     display: inline-flex;
     align-items: center;
@@ -556,6 +561,33 @@ tr:last-child td { border-bottom: 0; }
     color: var(--text-secondary);
 }
 .admin-checkbox input { width: auto; }
+
+.progress-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.progress-reports {
+    display: grid;
+    gap: 10px;
+}
+.progress-report-card {
+    border: var(--border-soft);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    padding: 12px;
+}
+.progress-report-card h3 {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+.progress-notes {
+    margin-top: 8px;
+    display: grid;
+    gap: 6px;
+}
+.progress-note-item {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
 
 @media (min-width: 900px) {
     .dashboard-grid { grid-template-columns: 1fr 1fr; }
@@ -584,4 +616,6 @@ tr:last-child td { border-bottom: 0; }
     .top-actions .btn-sm { width: 100%; }
     .top-actions .btn-ghost { grid-column: span 2; }
     .user-badge { min-width: 100%; align-items: flex-start; }
+    .admin-actions { flex-direction: column; align-items: flex-start; }
+    .progress-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
