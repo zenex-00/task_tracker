@@ -53,7 +53,8 @@ function pushNote(notes: string[], label: string, value: string): void {
 }
 
 export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<void> {
-  const [{ jsPDF }, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+  const jsPDF = (jsPdfMod as any).default || (jsPdfMod as any).jsPDF;
 
   const autoTable = (
     (autoTableMod as unknown as { default?: (doc: JsPdfDoc, opts: AutoTableOptions) => void; autoTable?: (doc: JsPdfDoc, opts: AutoTableOptions) => void })
