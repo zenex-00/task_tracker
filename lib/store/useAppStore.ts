@@ -13,11 +13,13 @@ import type {
   SyncStatus,
   Task,
   TimeEntry,
+  UploadField,
 } from '@/types';
 
 const PROJECTS_KEY = 'ft_projects';
 const HOUR_TYPES_KEY = 'ft_hour_types';
 const NOTE_FIELDS_KEY = 'ft_note_fields';
+const UPLOAD_FIELDS_KEY = 'ft_upload_fields';
 
 const DEFAULT_PROJECTS = ['YPMP', 'Hudhud', 'Sakeena', 'CON-BID', 'Other', 'Mewo'];
 const DEFAULT_HOUR_TYPES: HourType[] = [
@@ -31,6 +33,14 @@ const DEFAULT_NOTE_FIELDS: NoteField[] = [
   { icon: 'plan', name: "Tomorrow's Plan", placeholder: "What's planned for tomorrow?", required: false, color: 'var(--danger)' },
   { icon: 'link', name: 'Output Link', placeholder: 'GitHub commit / deployed URL', required: false, color: 'var(--text-muted)' },
 ];
+const DEFAULT_UPLOAD_FIELDS: UploadField[] = [
+  {
+    name: 'Requirement / Technical Documents',
+    placeholder: 'Attach requirement docs, technical docs, screenshots, or reference images.',
+    required: false,
+    accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg',
+  },
+];
 
 const DEFAULT_SETTINGS: AppSettings = {
   weeklyHourTarget: 40,
@@ -42,7 +52,7 @@ type AppStore = AppState & {
   loadAllData: () => Promise<boolean>;
   setSyncStatus: (status: SyncStatus) => void;
   setDataLoaded: (loaded: boolean) => void;
-  setLocalFallback: (payload: { projects: string[]; hourTypes: HourType[]; noteFields: NoteField[] }) => void;
+  setLocalFallback: (payload: { projects: string[]; hourTypes: HourType[]; noteFields: NoteField[]; uploadFields: UploadField[] }) => void;
   upsertTask: (task: Task) => void;
   deleteTask: (taskId: string) => void;
   upsertEntry: (entry: TimeEntry) => void;
@@ -55,6 +65,9 @@ type AppStore = AppState & {
   addNoteField: (nf: NoteField) => void;
   removeNoteField: (idx: number) => void;
   updateNoteFields: (fields: NoteField[]) => void;
+  addUploadField: (field: UploadField) => void;
+  removeUploadField: (idx: number) => void;
+  updateUploadFields: (fields: UploadField[]) => void;
   advanceTaskStatus: (taskId: string) => void;
   updateSettings: (settings: AppSettings) => void;
 };
@@ -105,17 +118,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
   projects: DEFAULT_PROJECTS,
   hourTypes: DEFAULT_HOUR_TYPES,
   noteFields: DEFAULT_NOTE_FIELDS,
+  uploadFields: DEFAULT_UPLOAD_FIELDS,
   settings: DEFAULT_SETTINGS,
   syncStatus: 'loading',
   isDataLoaded: false,
 
   setSyncStatus: (status) => set({ syncStatus: status }),
   setDataLoaded: (loaded) => set({ isDataLoaded: loaded }),
-  setLocalFallback: ({ projects, hourTypes, noteFields }) =>
+  setLocalFallback: ({ projects, hourTypes, noteFields, uploadFields }) =>
     set({
       projects: projects.length ? projects : DEFAULT_PROJECTS,
       hourTypes: hourTypes.length ? hourTypes : DEFAULT_HOUR_TYPES,
       noteFields: noteFields.length ? normalizeNoteFields(noteFields) : DEFAULT_NOTE_FIELDS,
+      uploadFields: uploadFields.length ? uploadFields : DEFAULT_UPLOAD_FIELDS,
     }),
 
   loadAllData: async () => {
@@ -148,10 +163,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       const projects = settings?.projects?.length ? settings.projects : get().projects;
       const hourTypes = settings?.hour_types?.length ? settings.hour_types : get().hourTypes;
       const noteFields = settings?.note_fields?.length ? normalizeNoteFields(settings.note_fields) : get().noteFields;
+      const uploadFields = settings?.upload_fields?.length ? settings.upload_fields : get().uploadFields;
 
       writeLocalArray(PROJECTS_KEY, projects);
       writeLocalArray(HOUR_TYPES_KEY, hourTypes);
       writeLocalArray(NOTE_FIELDS_KEY, noteFields);
+      writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
 
       set({
         tasks,
@@ -161,6 +178,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         projects,
         hourTypes,
         noteFields,
+        uploadFields,
         syncStatus: 'ok',
         isDataLoaded: true,
       });
@@ -321,6 +339,36 @@ export const useAppStore = create<AppStore>((set, get) => ({
     void syncSettings(get);
   },
 
+  addUploadField: (field) => {
+    set((state) => {
+      const uploadFields = [...state.uploadFields, field];
+      writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
+      return { uploadFields };
+    });
+    void syncSettings(get);
+  },
+
+  removeUploadField: (idx) => {
+    set((state) => {
+      const uploadFields = state.uploadFields.filter((_, i) => i !== idx);
+      writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
+      return { uploadFields };
+    });
+    void syncSettings(get);
+  },
+
+  updateUploadFields: (fields) => {
+    const uploadFields = fields.map((field) => ({
+      ...field,
+      name: field.name.trim(),
+      placeholder: field.placeholder || '',
+      accept: field.accept || DEFAULT_UPLOAD_FIELDS[0].accept,
+    }));
+    set({ uploadFields });
+    writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
+    void syncSettings(get);
+  },
+
   advanceTaskStatus: (taskId) => {
     const statuses: Array<Task['status']> = ['Not Started', 'In Progress', 'Completed'];
     const task = get().tasks.find((t) => t.id === taskId);
@@ -345,5 +393,6 @@ export function getLocalFallbackData() {
     projects: readLocalArray<string>(PROJECTS_KEY, DEFAULT_PROJECTS),
     hourTypes: readLocalArray<HourType>(HOUR_TYPES_KEY, DEFAULT_HOUR_TYPES),
     noteFields: normalizeNoteFields(readLocalArray<NoteField>(NOTE_FIELDS_KEY, DEFAULT_NOTE_FIELDS)),
+    uploadFields: readLocalArray<UploadField>(UPLOAD_FIELDS_KEY, DEFAULT_UPLOAD_FIELDS),
   };
 }

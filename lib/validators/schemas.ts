@@ -10,6 +10,20 @@ export const completionReportSchema = z.object({
   tomorrow: z.string(),
   link: z.string(),
   dynamicNotes: z.record(z.string(), z.string()),
+  attachments: z
+    .array(
+      z.object({
+        fieldName: z.string().optional(),
+        name: z.string(),
+        path: z.string(),
+        bucket: z.string(),
+        mimeType: z.string(),
+        size: z.number(),
+        uploadedAt: z.string(),
+        publicUrl: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const taskSchema = z.object({
@@ -47,6 +61,13 @@ export const noteFieldSchema = z.object({
   placeholder: z.string(),
   required: z.boolean(),
   color: z.string(),
+});
+
+export const uploadFieldSchema = z.object({
+  name: z.string(),
+  placeholder: z.string(),
+  required: z.boolean(),
+  accept: z.string(),
 });
 
 export const appSettingsSchema = z.object({

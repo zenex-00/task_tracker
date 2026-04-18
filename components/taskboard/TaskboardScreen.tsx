@@ -6,11 +6,13 @@ import { TaskCompletionForm } from '@/components/taskboard/TaskCompletionForm';
 import { ManageProjectsModal } from '@/components/modals/ManageProjectsModal';
 import { ManageHourTypesModal } from '@/components/modals/ManageHourTypesModal';
 import { ManageNoteFieldsModal } from '@/components/modals/ManageNoteFieldsModal';
+import { ManageUploadFieldsModal } from '@/components/modals/ManageUploadFieldsModal';
 
 export function TaskboardScreen() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [hourTypesOpen, setHourTypesOpen] = useState(false);
   const [noteFieldsOpen, setNoteFieldsOpen] = useState(false);
+  const [uploadFieldsOpen, setUploadFieldsOpen] = useState(false);
 
   const sectionHeader = useMemo(
     () => (
@@ -53,13 +55,18 @@ export function TaskboardScreen() {
             </span>
             Complete a Task
           </h2>
-          <TaskCompletionForm onManageHourTypes={() => setHourTypesOpen(true)} onManageNoteFields={() => setNoteFieldsOpen(true)} />
+          <TaskCompletionForm
+            onManageHourTypes={() => setHourTypesOpen(true)}
+            onManageNoteFields={() => setNoteFieldsOpen(true)}
+            onManageUploadFields={() => setUploadFieldsOpen(true)}
+          />
         </div>
       </div>
 
       <ManageProjectsModal isOpen={projectsOpen} onClose={() => setProjectsOpen(false)} />
       <ManageHourTypesModal isOpen={hourTypesOpen} onClose={() => setHourTypesOpen(false)} />
       <ManageNoteFieldsModal isOpen={noteFieldsOpen} onClose={() => setNoteFieldsOpen(false)} />
+      <ManageUploadFieldsModal isOpen={uploadFieldsOpen} onClose={() => setUploadFieldsOpen(false)} />
     </section>
   );
 }

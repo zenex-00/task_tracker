@@ -1,5 +1,6 @@
 'use client';
 
+import { CompletionReportsPanel } from '@/components/reports/CompletionReportsPanel';
 import { PdfReportButtons } from '@/components/reports/PdfReportButtons';
 import { ProjectsDonutChart } from '@/components/reports/ProjectsDonutChart';
 import { TasksTable } from '@/components/reports/TasksTable';
@@ -18,6 +19,7 @@ export function ReportsScreen() {
         <PdfReportButtons />
         <ProjectsDonutChart />
         <TasksTable />
+        <CompletionReportsPanel />
       </div>
     </section>
   );

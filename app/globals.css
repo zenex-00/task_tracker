@@ -538,6 +538,123 @@ textarea:focus {
   padding: 12px;
 }
 
+.attachments-section {
+  border-radius: var(--radius-md);
+  border: var(--border-soft);
+  background: var(--surface);
+  padding: 12px;
+}
+
+.attachments-help {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.file-picker-native {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.file-dropzone {
+  margin-top: 6px;
+  border: 1px dashed rgba(130, 151, 180, 0.45);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.3);
+  padding: 14px 12px;
+  text-align: center;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.file-dropzone.is-dragover {
+  border-color: rgba(31, 110, 212, 0.7);
+  background: rgba(31, 110, 212, 0.09);
+  box-shadow: 0 0 0 3px rgba(31, 110, 212, 0.1);
+}
+
+.file-dropzone-clickable {
+  cursor: pointer;
+}
+
+.dropzone-title {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dropzone-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.selected-files-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.selected-file-chip {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(130, 151, 180, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 7px 8px;
+}
+
+.file-kind-badge {
+  min-width: 38px;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(31, 110, 212, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(31, 110, 212, 0.2);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 6px;
+}
+
+.selected-file-name {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selected-file-size {
+  font-size: 0.77rem;
+  color: var(--text-secondary);
+}
+
+.selected-file-remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(206, 57, 72, 0.25);
+  background: rgba(206, 57, 72, 0.12);
+  color: var(--danger);
+  font-size: 1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.selected-file-remove:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
 .section-subhead {
   display: flex;
   align-items: center;
@@ -642,6 +759,31 @@ textarea:focus {
 .rc-text p {
   font-size: 0.78rem;
   color: var(--text-secondary);
+}
+
+.report-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.report-preview-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.report-preview-frame {
+  width: 100%;
+  height: calc(96vh - 170px);
+  min-height: 520px;
+  border: 1px solid rgba(127, 151, 183, 0.35);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.report-preview-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .table-header {
@@ -929,11 +1071,23 @@ tr:last-child td {
   gap: 8px;
 }
 
+.project-manage-row > input,
+.project-manage-row > select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.project-manage-row > label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .project-name-input {
   flex: 1;
 }
 
 .btn-remove-project {
+  flex: 0 0 34px;
   width: 34px;
   height: 34px;
   border-radius: 999px;
@@ -959,7 +1113,14 @@ tr:last-child td {
   margin-top: 10px;
 }
 
+.add-project-row > input,
+.add-project-row > select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .btn-add-project {
+  flex: 0 0 auto;
   border-radius: 10px;
   background: var(--accent);
   color: #fff;
@@ -998,6 +1159,18 @@ tr:last-child td {
   width: min(94vw, 760px);
 }
 
+.modal-fullscreen {
+  width: min(98vw, 1600px);
+  height: min(96vh, 1200px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-fullscreen .modal-body {
+  flex: 1;
+  overflow: auto;
+}
+
 .modal-header {
   padding: 14px 16px;
   display: flex;
@@ -1022,6 +1195,10 @@ tr:last-child td {
 }
 
 .btn-close-modal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
   width: 34px;
   height: 34px;
   border-radius: 999px;
@@ -1036,17 +1213,34 @@ tr:last-child td {
 }
 
 .hour-add-row #new-ht-code {
+  flex: 0 0 90px;
   width: 90px;
 }
 
-.hour-add-row #new-ht-max {
-  width: 90px;
+.project-manage-row .ht-code-input {
+  flex: 0 0 90px;
 }
 
-.hour-add-row #new-ht-color {
-  width: 46px;
-  height: 40px;
-  padding: 2px;
+.project-manage-row .ht-color-input,
+.hour-add-row input[type="color"] {
+  flex: 0 0 56px;
+  width: 56px;
+  min-width: 56px;
+  height: 42px;
+  padding: 3px;
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.project-manage-row .ht-color-input::-webkit-color-swatch-wrapper,
+.hour-add-row input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.project-manage-row .ht-color-input::-webkit-color-swatch,
+.hour-add-row input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 8px;
 }
 
 .note-add-row #new-nf-icon {
@@ -1066,6 +1260,10 @@ tr:last-child td {
 }
 
 .note-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
   margin-right: 0;
   width: 28px;
   height: 28px;
@@ -1235,6 +1433,27 @@ tr:last-child td {
   color: var(--text-primary);
 }
 
+.progress-attachments {
+  margin-top: 10px;
+  font-size: 0.9rem;
+}
+
+.progress-attachments ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.progress-attachments a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.progress-attachments a:hover {
+  text-decoration: underline;
+}
+
 .slide-up {
   animation: fade-up var(--transition-base) both;
 }
@@ -1349,6 +1568,15 @@ tr:last-child td {
     flex-wrap: wrap;
   }
 
+  .selected-file-chip {
+    grid-template-columns: auto 1fr auto;
+    row-gap: 4px;
+  }
+
+  .selected-file-size {
+    grid-column: 2 / 3;
+  }
+
   .top-actions {
     width: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1361,6 +1589,30 @@ tr:last-child td {
 
   .top-actions .btn-ghost {
     grid-column: span 2;
+  }
+
+  .report-card {
+    flex-wrap: wrap;
+  }
+
+  .report-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .report-actions button {
+    flex: 1 1 0;
+  }
+
+  .modal-fullscreen {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .report-preview-frame {
+    height: calc(100vh - 190px);
+    min-height: 0;
   }
 
   .admin-actions {

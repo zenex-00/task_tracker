@@ -30,7 +30,13 @@ type JsPdfDoc = {
   getNumberOfPages: () => number;
   setPage: (page: number) => void;
   save: (fileName: string) => void;
+  output: (type: 'blob') => Blob;
 };
+
+export interface GeneratedReportPdf {
+  blob: Blob;
+  fileName: string;
+}
 
 function normalizeLabel(label: string): string {
   const raw = String(label || '').trim();
@@ -52,7 +58,7 @@ function pushNote(notes: string[], label: string, value: string): void {
   notes.push(`${cleanLabel}\n${cleanValue}`);
 }
 
-export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<void> {
+export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const jsPDF = (jsPdfMod as any).default || (jsPdfMod as any).jsPDF;
 
@@ -258,6 +264,15 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
         pushNote(notes, 'GitHub Link', report?.link || '');
       }
 
+      const attachments = report?.attachments || [];
+      if (attachments.length) {
+        const lines = attachments.map((attachment) => {
+          const prefixedName = attachment.fieldName ? `[${attachment.fieldName}] ${attachment.name}` : attachment.name;
+          return attachment.publicUrl ? `${prefixedName}: ${attachment.publicUrl}` : prefixedName;
+        });
+        pushNote(notes, 'Attachments', lines.join('\n'));
+      }
+
       return [t.dateCompleted || '-', t.project || '-', t.name || '-', notes.join('\n\n--------------------\n\n') || 'No additional notes'];
     });
 
@@ -284,6 +299,8 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
     drawFooter(i);
   }
 
-  const filename = `professional_report_${type}_${today}.pdf`;
-  doc.save(filename);
+  const fileName = `professional_report_${type}_${today}.pdf`;
+  const blob = doc.output('blob');
+
+  return { blob, fileName };
 }

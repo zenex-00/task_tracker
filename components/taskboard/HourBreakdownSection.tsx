@@ -19,15 +19,9 @@ export function HourBreakdownSection({ hourTypes, onManage }: HourBreakdownSecti
 
       <div>
         {hourTypes.map((ht) => {
-          const bg = ht.color.startsWith('#') ? `${ht.color}22` : 'var(--surface-alt)';
           return (
             <div key={ht.code} className="hour-row">
               <span className="hour-row-label" style={{ color: ht.color }}>{ht.name}</span>
-              {ht.maxPercent ? (
-                <span className="badge" style={{ background: bg, color: ht.color }}>
-                  Max {ht.maxPercent}%
-                </span>
-              ) : null}
               <input id={`hr-${ht.code.toLowerCase()}`} type="number" step="0.25" min="0" defaultValue="0" />
             </div>
           );

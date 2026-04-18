@@ -54,20 +54,6 @@ export function ManageHourTypesModal({ isOpen, onClose }: ManageHourTypesModalPr
               placeholder="Name"
             />
             <input
-              type="number"
-              className="ht-max-input"
-              value={ht.maxPercent}
-              min={0}
-              max={100}
-              onChange={(e) => {
-                const next = [...draft];
-                next[idx] = { ...ht, maxPercent: e.target.value };
-                setDraft(next);
-              }}
-              placeholder="Max%"
-              style={{ width: 70 }}
-            />
-            <input
               type="color"
               className="ht-color-input"
               value={ht.color}
@@ -106,14 +92,6 @@ export function ManageHourTypesModal({ isOpen, onClose }: ManageHourTypesModalPr
           value={newHourType.name}
           placeholder="Name"
           onChange={(e) => setNewHourType((prev) => ({ ...prev, name: e.target.value }))}
-        />
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={newHourType.maxPercent}
-          placeholder="Max%"
-          onChange={(e) => setNewHourType((prev) => ({ ...prev, maxPercent: e.target.value }))}
         />
         <input type="color" value={newHourType.color} onChange={(e) => setNewHourType((prev) => ({ ...prev, color: e.target.value }))} />
         <button

@@ -16,12 +16,24 @@ export type TeamRole =
   | 'Other'
   | (string & {});
 
+export interface ReportAttachment {
+  fieldName?: string;
+  name: string;
+  path: string;
+  bucket: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+  publicUrl?: string;
+}
+
 export interface CompletionReport {
   output: string;
   blockers: string;
   tomorrow: string;
   link: string;
   dynamicNotes: Record<string, string>;
+  attachments?: ReportAttachment[];
 }
 
 export interface Task {
@@ -61,6 +73,13 @@ export interface NoteField {
   color: string;
 }
 
+export interface UploadField {
+  name: string;
+  placeholder: string;
+  required: boolean;
+  accept: string;
+}
+
 export interface AppSettings {
   weeklyHourTarget: number;
   monthlyTaskTarget: number;
@@ -72,6 +91,7 @@ export interface AppState {
   projects: string[];
   hourTypes: HourType[];
   noteFields: NoteField[];
+  uploadFields: UploadField[];
   settings: AppSettings;
   syncStatus: SyncStatus;
   isDataLoaded: boolean;
@@ -108,6 +128,7 @@ export interface SettingsRow {
   projects: string[] | null;
   hour_types: HourType[] | null;
   note_fields: NoteField[] | null;
+  upload_fields: UploadField[] | null;
 }
 
 export interface UserProfile {

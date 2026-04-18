@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { getCurrentUserWithProfile } from '@/lib/auth/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { CompletionReport } from '@/types';
+import type { CompletionReport, ReportAttachment } from '@/types';
 
 type TaskProgressRow = {
   id: string;
@@ -35,6 +35,44 @@ type UserProfileRow = {
 
 function parseHours(value: number | string | null | undefined): number {
   return Number.parseFloat(String(value ?? 0)) || 0;
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+async function resolveReportAttachments(adminClient: ReturnType<typeof createAdminClient>, attachments: ReportAttachment[]) {
+  if (!attachments.length) return [];
+
+  const urlsByPath = new Map<string, string>();
+  const bucketToPaths = new Map<string, string[]>();
+
+  attachments.forEach((attachment) => {
+    if (!bucketToPaths.has(attachment.bucket)) bucketToPaths.set(attachment.bucket, []);
+    bucketToPaths.get(attachment.bucket)?.push(attachment.path);
+  });
+
+  await Promise.all(
+    Array.from(bucketToPaths.entries()).map(async ([bucket, paths]) => {
+      const { data } = await adminClient.storage.from(bucket).createSignedUrls(paths, 60 * 60);
+      (data || []).forEach((item) => {
+        if (item.path && item.signedUrl) urlsByPath.set(item.path, item.signedUrl);
+      });
+    }),
+  );
+
+  return attachments.map((attachment) => ({
+    ...attachment,
+    resolvedUrl: urlsByPath.get(attachment.path) || attachment.publicUrl || '',
+  }));
 }
 
 export default async function AdminUserProgressPage({ params }: { params: { id: string } }) {
@@ -114,6 +152,13 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
   const totalHours = entries.reduce((sum, entry) => sum + parseHours(entry.hours), 0);
   const completedTasks = tasks.filter((task) => task.status === 'Completed').length;
   const reports = tasks.filter((task) => task.completion_report);
+  const reportsWithAttachments = await Promise.all(
+    reports.map(async (task) => {
+      const attachments = task.completion_report?.attachments || [];
+      const resolvedAttachments = await resolveReportAttachments(adminClient, attachments);
+      return { task, resolvedAttachments };
+    }),
+  );
 
   return (
     <section className="view active">
@@ -244,7 +289,7 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
           </div>
           {reports.length ? (
             <div className="progress-reports">
-              {reports.map((task) => (
+              {reportsWithAttachments.map(({ task, resolvedAttachments }) => (
                 <article key={task.id} className="progress-report-card">
                   <h3>
                     {task.name} <span className="text-muted">({task.project || 'General'})</span>
@@ -257,6 +302,26 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
                       </div>
                     ))}
                   </div>
+                  {resolvedAttachments.length ? (
+                    <div className="progress-attachments">
+                      <strong>Attachments</strong>
+                      <ul>
+                        {resolvedAttachments.map((attachment) => (
+                          <li key={`${attachment.bucket}/${attachment.path}`}>
+                            {attachment.resolvedUrl ? (
+                              <a href={attachment.resolvedUrl} target="_blank" rel="noreferrer">
+                                {attachment.name}
+                              </a>
+                            ) : (
+                              <span>{attachment.name}</span>
+                            )}{' '}
+                            {attachment.fieldName ? <span className="text-muted">[{attachment.fieldName}]</span> : null}{' '}
+                            <span className="text-muted">({formatFileSize(attachment.size)})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>

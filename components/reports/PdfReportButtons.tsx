@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { generateReport } from '@/lib/pdf/generateReport';
 import { useAppStore } from '@/lib/store/useAppStore';
 import type { ReportType } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 const cards: Array<{ type: ReportType; title: string; desc: string; cls: string }> = [
   { type: 'daily', title: 'Daily Report', desc: 'Today entries and notes', cls: 'rc-day' },
@@ -16,18 +17,63 @@ const cards: Array<{ type: ReportType; title: string; desc: string; cls: string 
 export function PdfReportButtons() {
   const tasks = useAppStore((s) => s.tasks);
   const timeEntries = useAppStore((s) => s.timeEntries);
-  const [loading, setLoading] = useState<ReportType | null>(null);
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ type: ReportType; url: string; fileName: string } | null>(null);
 
-  const run = async (type: ReportType) => {
+  useEffect(() => {
+    return () => {
+      if (preview?.url) {
+        URL.revokeObjectURL(preview.url);
+      }
+    };
+  }, [preview]);
+
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return null;
+    });
+  };
+
+  const downloadBlob = (url: string, fileName: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+  };
+
+  const viewReport = async (type: ReportType) => {
+    const key = `${type}-view`;
     try {
-      setLoading(type);
-      await generateReport(type, timeEntries, tasks);
+      setLoadingKey(key);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const url = URL.createObjectURL(blob);
+      setPreview((prev) => {
+        if (prev?.url) URL.revokeObjectURL(prev.url);
+        return { type, url, fileName };
+      });
+    } catch (err) {
+      console.error(err);
+      toast('Unable to open PDF preview.');
+    } finally {
+      setLoadingKey(null);
+    }
+  };
+
+  const downloadReport = async (type: ReportType) => {
+    const key = `${type}-download`;
+    try {
+      setLoadingKey(key);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const url = URL.createObjectURL(blob);
+      downloadBlob(url, fileName);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast(`Professional ${type} report downloaded.`);
     } catch (err) {
       console.error(err);
       toast('PDF generation failed.');
     } finally {
-      setLoading(null);
+      setLoadingKey(null);
     }
   };
 
@@ -46,7 +92,7 @@ export function PdfReportButtons() {
 
       <div className="report-btn-group">
         {cards.map((card) => (
-          <button key={card.type} className="report-card" onClick={() => run(card.type)} disabled={loading === card.type}>
+          <div key={card.type} className="report-card">
             <div className={`rc-icon ${card.cls}`} aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -55,11 +101,47 @@ export function PdfReportButtons() {
             </div>
             <div className="rc-text">
               <h3>{card.title}</h3>
-              <p>{loading === card.type ? 'Generating...' : card.desc}</p>
+              <p>{card.desc}</p>
             </div>
-          </button>
+            <div className="report-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => viewReport(card.type)}
+                disabled={loadingKey === `${card.type}-view` || loadingKey === `${card.type}-download`}
+              >
+                {loadingKey === `${card.type}-view` ? 'Loading...' : 'View'}
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => downloadReport(card.type)}
+                disabled={loadingKey === `${card.type}-view` || loadingKey === `${card.type}-download`}
+              >
+                {loadingKey === `${card.type}-download` ? 'Downloading...' : 'Download'}
+              </button>
+            </div>
+          </div>
         ))}
       </div>
+
+      <Modal
+        isOpen={Boolean(preview)}
+        onClose={closePreview}
+        title={preview ? `${cards.find((c) => c.type === preview.type)?.title ?? 'Report'} Preview` : 'Report Preview'}
+        fullScreen
+      >
+        {preview ? (
+          <div className="report-preview-wrap">
+            <iframe src={preview.url} title="Report preview" className="report-preview-frame" />
+            <div className="report-preview-actions">
+              <button type="button" className="btn-primary" onClick={() => downloadBlob(preview.url, preview.fileName)}>
+                Download PDF
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
