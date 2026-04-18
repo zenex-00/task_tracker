@@ -22,7 +22,6 @@ type TimeEntryProgressRow = {
   hours: number | string | null;
   project: string | null;
   description: string | null;
-  billable: boolean;
 };
 
 type UserProfileRow = {
@@ -82,7 +81,7 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
 
   const { data: entriesData, error: entriesError } = await adminClient
     .from('time_entries')
-    .select('id, date, hours, project, description, billable')
+    .select('id, date, hours, project, description')
     .eq('user_id', userId)
     .order('date', { ascending: false });
 
@@ -154,7 +153,6 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
                   <th>Date</th>
                   <th>Project</th>
                   <th>Hours</th>
-                  <th>Billable</th>
                   <th>Description</th>
                 </tr>
               </thead>
@@ -165,13 +163,12 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
                       <td>{entry.date}</td>
                       <td>{entry.project || '-'}</td>
                       <td>{parseHours(entry.hours).toFixed(2)}h</td>
-                      <td>{entry.billable ? 'Yes' : 'No'}</td>
                       <td>{entry.description || '-'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5}>No time entries found.</td>
+                    <td colSpan={4}>No time entries found.</td>
                   </tr>
                 )}
               </tbody>

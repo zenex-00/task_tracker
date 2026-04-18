@@ -27,6 +27,7 @@ export function AdminCreateUserPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CreateUserPayload>(initialForm);
+  const [customRole, setCustomRole] = useState('');
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -39,10 +40,17 @@ export function AdminCreateUserPage() {
 
     setIsSubmitting(true);
 
+    const finalRole = form.role === 'Other' ? customRole.trim() : form.role;
+
+    if (!finalRole) {
+      toast.error('Please specify a role.');
+      return;
+    }
+
     const response = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, role: finalRole }),
     });
     const payload = (await response.json()) as { error?: string };
     setIsSubmitting(false);
@@ -132,6 +140,20 @@ export function AdminCreateUserPage() {
               ))}
             </select>
           </div>
+
+          {form.role === 'Other' && (
+            <div className="form-group slide-up">
+              <label htmlFor="custom-role">Custom Role Name</label>
+              <input
+                id="custom-role"
+                type="text"
+                value={customRole}
+                onChange={(event) => setCustomRole(event.target.value)}
+                placeholder="Enter custom job role..."
+                required
+              />
+            </div>
+          )}
 
           <button className="btn-primary" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating User...' : 'Create User'}

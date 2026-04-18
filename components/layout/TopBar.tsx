@@ -50,7 +50,7 @@ export function TopBar({ user }: TopBarProps) {
           </svg>
         </div>
         <h1>
-          Freelance<span>Tracker</span>
+          Daily<span>Tracker</span>
         </h1>
         <SyncDot />
       </div>

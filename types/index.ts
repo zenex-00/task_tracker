@@ -13,7 +13,8 @@ export type TeamRole =
   | 'Project Manager'
   | 'QA Engineer'
   | 'DevOps Engineer'
-  | 'Other';
+  | 'Other'
+  | (string & {});
 
 export interface CompletionReport {
   output: string;

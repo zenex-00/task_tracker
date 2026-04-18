@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 const outfit = Outfit({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Freelance Tracker',
+  title: 'Daily Tracker',
   description: 'Minimal task and time tracking app with reports and analytics.',
 };
 

@@ -90,8 +90,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
   }
 
-  if (!TEAM_ROLES.includes(role)) {
-    return NextResponse.json({ error: 'Invalid role selected.' }, { status: 400 });
+  if (!role || typeof role !== 'string' || role.trim() === '') {
+    return NextResponse.json({ error: 'A valid role is required.' }, { status: 400 });
   }
 
   if (password.length < 8) {
