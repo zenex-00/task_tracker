@@ -29,7 +29,7 @@ export function LoginForm() {
     }
 
     toast.success('Logged in successfully');
-    router.replace('/taskboard');
+    router.replace('/');
     router.refresh();
   };
 

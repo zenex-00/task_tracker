@@ -25,7 +25,7 @@ export default function DashboardShell({ children, user }: DashboardShellProps) 
     <>
       <TopBar user={user} />
       <main className="content">{children}</main>
-      <BottomTabs />
+      <BottomTabs isAdmin={user.isAdmin} />
     </>
   );
 }

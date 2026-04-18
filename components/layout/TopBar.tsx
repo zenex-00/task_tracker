@@ -74,7 +74,7 @@ export function TopBar({ user }: TopBarProps) {
             Settings
           </button>
           {user.isAdmin ? (
-            <button type="button" className="btn-secondary btn-sm" onClick={() => router.push('/admin/users')}>
+            <button type="button" className="btn-secondary btn-sm" onClick={() => router.push('/admin/team')}>
               Admin
             </button>
           ) : null}

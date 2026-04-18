@@ -6,7 +6,7 @@ import { getCurrentUserWithProfile } from '@/lib/auth/server';
 export default async function LoginPage() {
   const currentUser = await getCurrentUserWithProfile();
   if (currentUser) {
-    redirect('/taskboard');
+    redirect(currentUser.profile?.is_admin ? '/admin/team' : '/taskboard');
   }
 
   return <LoginForm />;
