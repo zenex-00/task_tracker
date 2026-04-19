@@ -16,7 +16,7 @@ type CreateUserBody = {
 async function verifyAdmin() {
   let supabase;
   try {
-    supabase = createClient();
+    supabase = await createClient();
   } catch (error) {
     return {
       ok: false as const,

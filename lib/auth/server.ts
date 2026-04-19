@@ -6,7 +6,7 @@ export async function getCurrentUserWithProfile(): Promise<{
   email: string;
   profile: UserProfile | null;
 } | null> {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
 
   if (error || !data.user) {

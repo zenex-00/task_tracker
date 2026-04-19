@@ -56,6 +56,7 @@ type AppStore = AppState & {
   upsertTask: (task: Task) => void;
   deleteTask: (taskId: string) => void;
   upsertEntry: (entry: TimeEntry) => void;
+  deleteEntry: (entryId: string) => void;
   addProject: (name: string) => void;
   removeProject: (idx: number) => void;
   updateProjects: (projects: string[]) => void;
@@ -100,6 +101,7 @@ async function syncSettings(get: () => AppStore): Promise<void> {
     projects: s.projects,
     hour_types: s.hourTypes,
     note_fields: s.noteFields,
+    upload_fields: s.uploadFields,
   });
 
   if (error) {
@@ -111,7 +113,23 @@ async function syncSettings(get: () => AppStore): Promise<void> {
   s.setSyncStatus('ok');
 }
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create<AppStore>((set, get) => {
+  const ensureCurrentUserId = async (): Promise<string | null> => {
+    const existing = get().currentUserId;
+    if (existing) return existing;
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      console.error('Missing authenticated user for database mutation:', authError || new Error('Missing authenticated user'));
+      return null;
+    }
+
+    const userId = authData.user.id;
+    set({ currentUserId: userId });
+    return userId;
+  };
+
+  return {
   tasks: [],
   timeEntries: [],
   currentUserId: null,
@@ -202,7 +220,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const payload = mapTaskToDBWithUser(task, get().currentUserId);
+      const userId = await ensureCurrentUserId();
+      if (!userId) {
+        get().setSyncStatus('error');
+        return;
+      }
+
+      const payload = mapTaskToDBWithUser(task, userId);
       const { error } = await supabase.from('tasks').upsert(payload);
       if (error) {
         console.error('Task upsert error:', error);
@@ -221,18 +245,15 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const currentUserId = get().currentUserId;
-      let taskDeleteQuery = supabase.from('tasks').delete().eq('id', taskId);
-      let entryDeleteQuery = supabase.from('time_entries').delete().eq('task_id', taskId);
-      if (currentUserId) {
-        taskDeleteQuery = taskDeleteQuery.eq('user_id', currentUserId);
-        entryDeleteQuery = entryDeleteQuery.eq('user_id', currentUserId);
+      const userId = await ensureCurrentUserId();
+      if (!userId) {
+        get().setSyncStatus('error');
+        return;
       }
 
-      const { error: taskErr } = await taskDeleteQuery;
-      const { error: entryErr } = await entryDeleteQuery;
-      if (taskErr || entryErr) {
-        console.error('Task delete error:', taskErr || entryErr);
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId).eq('user_id', userId);
+      if (error) {
+        console.error('Task delete error:', error);
         get().setSyncStatus('error');
         return;
       }
@@ -251,13 +272,43 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
     void (async () => {
       get().setSyncStatus('loading');
-      const payload = mapEntryToDBWithUser(entry, get().currentUserId);
+      const userId = await ensureCurrentUserId();
+      if (!userId) {
+        get().setSyncStatus('error');
+        return;
+      }
+
+      const payload = mapEntryToDBWithUser(entry, userId);
       const { error } = await supabase.from('time_entries').upsert(payload);
       if (error) {
         console.error('Entry upsert error:', error);
         get().setSyncStatus('error');
         return;
       }
+      get().setSyncStatus('ok');
+    })();
+  },
+
+  deleteEntry: (entryId) => {
+    set((state) => ({
+      timeEntries: state.timeEntries.filter((entry) => entry.id !== entryId),
+    }));
+
+    void (async () => {
+      get().setSyncStatus('loading');
+      const userId = await ensureCurrentUserId();
+      if (!userId) {
+        get().setSyncStatus('error');
+        return;
+      }
+
+      const { error } = await supabase.from('time_entries').delete().eq('id', entryId).eq('user_id', userId);
+      if (error) {
+        console.error('Entry delete error:', error);
+        get().setSyncStatus('error');
+        return;
+      }
+
       get().setSyncStatus('ok');
     })();
   },
@@ -386,7 +437,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ settings });
     void syncSettings(get);
   },
-}));
+};
+});
 
 export function getLocalFallbackData() {
   return {

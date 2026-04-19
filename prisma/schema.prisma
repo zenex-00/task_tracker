@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Task {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String      @map("user_id") @db.Uuid
+  name             String
+  project          String      @default("General")
+  hoursSpent       Decimal     @default(0) @map("hours_spent") @db.Decimal(10, 2)
+  priority         String      @default("Medium")
+  status           String      @default("Not Started")
+  dateCompleted    DateTime?   @map("date_completed") @db.Date
+  createdDate      DateTime    @default(dbgenerated("CURRENT_DATE")) @map("created_date") @db.Date
+  completionReport Json?       @map("completion_report")
+  timeEntries      TimeEntry[]
+
+  @@index([userId], map: "tasks_user_id_idx")
+  @@map("tasks")
+}
+
+model TimeEntry {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  date        DateTime @db.Date
+  hours       Decimal  @default(0) @db.Decimal(10, 2)
+  taskId      String?  @map("task_id") @db.Uuid
+  billable    Boolean  @default(false)
+  project     String   @default("General")
+  description String   @default("")
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId], map: "time_entries_task_id_idx")
+  @@index([userId], map: "time_entries_user_id_idx")
+  @@map("time_entries")
+}
+
+model Setting {
+  id                Int      @id
+  weeklyHourTarget  Int      @default(40) @map("weekly_hour_target")
+  monthlyTaskTarget Int      @default(100) @map("monthly_task_target")
+  projects          String[] @default([])
+  hourTypes         Json     @default("[]") @map("hour_types")
+  noteFields        Json     @default("[]") @map("note_fields")
+  uploadFields      Json     @default("[]") @map("upload_fields")
+
+  @@map("settings")
+}
+
+model UserProfile {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  jobRole   String   @map("job_role")
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("user_profiles")
+}
