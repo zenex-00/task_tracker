@@ -41,7 +41,15 @@ export interface GeneratedReportPdf {
 function normalizeLabel(label: string): string {
   const raw = String(label || '').trim();
   const lower = raw.toLowerCase();
-  if (lower.includes('github') || lower.includes('git') || lower.includes('repo') || lower.includes('link') || lower.includes('url')) {
+  const words = lower.split(/[^a-z0-9]+/).filter(Boolean);
+  if (
+    words.includes('github') ||
+    words.includes('git') ||
+    words.includes('repo') ||
+    words.includes('repository') ||
+    words.includes('link') ||
+    words.includes('url')
+  ) {
     return 'GitHub Link';
   }
   if (lower.includes('blocker')) return 'Blockers';
@@ -248,6 +256,7 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
         const consumed = new Set<string>();
         orderedLabels.forEach((label) => {
           Object.keys(report.dynamicNotes).forEach((k) => {
+            if (k.startsWith('__')) return;
             if (normalizeLabel(k) === label && !consumed.has(k)) {
               pushNote(notes, label, report.dynamicNotes[k]);
               consumed.add(k);
@@ -255,6 +264,7 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
           });
         });
         Object.keys(report.dynamicNotes).forEach((k) => {
+          if (k.startsWith('__')) return;
           if (!consumed.has(k)) pushNote(notes, normalizeLabel(k), report.dynamicNotes[k]);
         });
       } else {
@@ -262,15 +272,6 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
         pushNote(notes, 'Blockers', report?.blockers || '');
         pushNote(notes, "Tomorrow's Plan", report?.tomorrow || '');
         pushNote(notes, 'GitHub Link', report?.link || '');
-      }
-
-      const attachments = report?.attachments || [];
-      if (attachments.length) {
-        const lines = attachments.map((attachment) => {
-          const prefixedName = attachment.fieldName ? `[${attachment.fieldName}] ${attachment.name}` : attachment.name;
-          return attachment.publicUrl ? `${prefixedName}: ${attachment.publicUrl}` : prefixedName;
-        });
-        pushNote(notes, 'Attachments', lines.join('\n'));
       }
 
       return [t.dateCompleted || '-', t.project || '-', t.name || '-', notes.join('\n\n--------------------\n\n') || 'No additional notes'];

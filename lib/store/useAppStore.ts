@@ -53,9 +53,9 @@ type AppStore = AppState & {
   setSyncStatus: (status: SyncStatus) => void;
   setDataLoaded: (loaded: boolean) => void;
   setLocalFallback: (payload: { projects: string[]; hourTypes: HourType[]; noteFields: NoteField[]; uploadFields: UploadField[] }) => void;
-  upsertTask: (task: Task) => void;
+  upsertTask: (task: Task) => Promise<boolean>;
   deleteTask: (taskId: string) => void;
-  upsertEntry: (entry: TimeEntry) => void;
+  upsertEntry: (entry: TimeEntry) => Promise<boolean>;
   deleteEntry: (entryId: string) => void;
   addProject: (name: string) => void;
   removeProject: (idx: number) => void;
@@ -213,7 +213,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     }
   },
 
-  upsertTask: (task) => {
+  upsertTask: async (task) => {
     set((state) => {
       const idx = state.tasks.findIndex((t) => t.id === task.id);
       if (idx === -1) return { tasks: [task, ...state.tasks] };
@@ -222,23 +222,22 @@ export const useAppStore = create<AppStore>((set, get) => {
       return { tasks };
     });
 
-    void (async () => {
-      get().setSyncStatus('loading');
-      const userId = await ensureCurrentUserId();
-      if (!userId) {
-        get().setSyncStatus('error');
-        return;
-      }
+    get().setSyncStatus('loading');
+    const userId = await ensureCurrentUserId();
+    if (!userId) {
+      get().setSyncStatus('error');
+      return false;
+    }
 
-      const payload = mapTaskToDBWithUser(task, userId);
-      const { error } = await supabase.from('tasks').upsert(payload);
-      if (error) {
-        console.error('Task upsert error:', error);
-        get().setSyncStatus('error');
-        return;
-      }
-      get().setSyncStatus('ok');
-    })();
+    const payload = mapTaskToDBWithUser(task, userId);
+    const { error } = await supabase.from('tasks').upsert(payload);
+    if (error) {
+      console.error('Task upsert error:', error);
+      get().setSyncStatus('error');
+      return false;
+    }
+    get().setSyncStatus('ok');
+    return true;
   },
 
   deleteTask: (taskId) => {
@@ -265,7 +264,7 @@ export const useAppStore = create<AppStore>((set, get) => {
     })();
   },
 
-  upsertEntry: (entry) => {
+  upsertEntry: async (entry) => {
     set((state) => {
       const idx = state.timeEntries.findIndex((e) => e.id === entry.id);
       if (idx === -1) return { timeEntries: [entry, ...state.timeEntries] };
@@ -274,23 +273,22 @@ export const useAppStore = create<AppStore>((set, get) => {
       return { timeEntries };
     });
 
-    void (async () => {
-      get().setSyncStatus('loading');
-      const userId = await ensureCurrentUserId();
-      if (!userId) {
-        get().setSyncStatus('error');
-        return;
-      }
+    get().setSyncStatus('loading');
+    const userId = await ensureCurrentUserId();
+    if (!userId) {
+      get().setSyncStatus('error');
+      return false;
+    }
 
-      const payload = mapEntryToDBWithUser(entry, userId);
-      const { error } = await supabase.from('time_entries').upsert(payload);
-      if (error) {
-        console.error('Entry upsert error:', error);
-        get().setSyncStatus('error');
-        return;
-      }
-      get().setSyncStatus('ok');
-    })();
+    const payload = mapEntryToDBWithUser(entry, userId);
+    const { error } = await supabase.from('time_entries').upsert(payload);
+    if (error) {
+      console.error('Entry upsert error:', error);
+      get().setSyncStatus('error');
+      return false;
+    }
+    get().setSyncStatus('ok');
+    return true;
   },
 
   deleteEntry: (entryId) => {

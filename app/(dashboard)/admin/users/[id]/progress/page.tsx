@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { AdminUserSubmittedReports } from '@/components/reports/AdminUserSubmittedReports';
 import { getCurrentUserWithProfile } from '@/lib/auth/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { CompletionReport, ReportAttachment } from '@/types';
+import type { CompletionReport, ReportAttachment, Task, TimeEntry } from '@/types';
 
 type TaskProgressRow = {
   id: string;
@@ -35,18 +36,6 @@ type UserProfileRow = {
 
 function parseHours(value: number | string | null | undefined): number {
   return Number.parseFloat(String(value ?? 0)) || 0;
-}
-
-function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = bytes;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 async function resolveReportAttachments(adminClient: ReturnType<typeof createAdminClient>, attachments: ReportAttachment[]) {
@@ -158,6 +147,43 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
       const resolvedAttachments = await resolveReportAttachments(adminClient, attachments);
       return { task, resolvedAttachments };
     }),
+  );
+
+  const pdfTasks: Task[] = tasks.map((task) => ({
+    id: task.id,
+    name: task.name,
+    project: task.project || 'General',
+    hoursSpent: parseHours(task.hours_spent),
+    priority: 'Medium',
+    status: task.status === 'Completed' ? 'Completed' : task.status === 'In Progress' ? 'In Progress' : 'Not Started',
+    dateCompleted: task.date_completed,
+    createdDate: task.created_date || '',
+    completionReport: task.completion_report,
+  }));
+
+  const pdfEntries: TimeEntry[] = entries.map((entry) => ({
+    id: entry.id,
+    date: entry.date,
+    hours: parseHours(entry.hours),
+    taskId: null,
+    billable: true,
+    project: entry.project || 'General',
+    description: entry.description || '',
+  }));
+
+  const submittedFiles = reportsWithAttachments.flatMap(({ task, resolvedAttachments }) =>
+    resolvedAttachments
+      .filter((attachment) => Boolean(attachment.resolvedUrl))
+      .map((attachment) => ({
+        key: `${attachment.bucket}/${attachment.path}`,
+        name: attachment.name,
+        url: attachment.resolvedUrl || '',
+        project: task.project || 'General',
+        completedDate: task.date_completed || '-',
+        taskName: task.name,
+        fieldName: attachment.fieldName,
+        size: attachment.size,
+      })),
   );
 
   return (
@@ -284,47 +310,11 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
           <div className="section-header">
             <div>
               <h2 className="section-title">Completion Reports</h2>
-              <p className="section-subtitle">All submitted reports and notes by this user.</p>
+              <p className="section-subtitle">Daily reports grouped by project and date.</p>
             </div>
           </div>
           {reports.length ? (
-            <div className="progress-reports">
-              {reportsWithAttachments.map(({ task, resolvedAttachments }) => (
-                <article key={task.id} className="progress-report-card">
-                  <h3>
-                    {task.name} <span className="text-muted">({task.project || 'General'})</span>
-                  </h3>
-                  <p className="text-muted">Completed: {task.date_completed || '-'}</p>
-                  <div className="progress-notes">
-                    {Object.entries(task.completion_report?.dynamicNotes || {}).map(([label, value]) => (
-                      <div key={label} className="progress-note-item">
-                        <strong>{label}:</strong> {value || '-'}
-                      </div>
-                    ))}
-                  </div>
-                  {resolvedAttachments.length ? (
-                    <div className="progress-attachments">
-                      <strong>Attachments</strong>
-                      <ul>
-                        {resolvedAttachments.map((attachment) => (
-                          <li key={`${attachment.bucket}/${attachment.path}`}>
-                            {attachment.resolvedUrl ? (
-                              <a href={attachment.resolvedUrl} target="_blank" rel="noreferrer">
-                                {attachment.name}
-                              </a>
-                            ) : (
-                              <span>{attachment.name}</span>
-                            )}{' '}
-                            {attachment.fieldName ? <span className="text-muted">[{attachment.fieldName}]</span> : null}{' '}
-                            <span className="text-muted">({formatFileSize(attachment.size)})</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
+            <AdminUserSubmittedReports tasks={pdfTasks} timeEntries={pdfEntries} attachments={submittedFiles} />
           ) : (
             <p className="text-muted">No completion reports found.</p>
           )}

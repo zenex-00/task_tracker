@@ -355,11 +355,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       return;
     }
 
-    const userRes = await supabase.auth.getUser();
-    const user = userRes.data.user;
-    const submittedAt = new Date().toISOString();
-
-    projectTasks.forEach((draft) => {
+    for (const draft of projectTasks) {
       const finalTask: Task = {
         id: draft.id,
         name: draft.name,
@@ -374,22 +370,25 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
           blockers: draft.dynamicNotes.Blockers || '',
           tomorrow: draft.dynamicNotes["Tomorrow's Plan"] || '',
           link: draft.dynamicNotes['Output Link'] || '',
-          dynamicNotes: {
-            ...draft.dynamicNotes,
-            '__selectedProject': selectedProject,
-            '__overallProgress': `${projectProgress}%`,
-            '__submissionTime': submittedAt,
-            '__submittedBy': user?.email || user?.id || 'Unknown User',
-            '__reportTaskCount': String(projectTasks.length),
-            '__reportTaskNames': projectTasks.map((t) => t.name).join(', '),
-          },
+          dynamicNotes: { ...draft.dynamicNotes },
           attachments: draft.attachments,
         },
       };
 
-      upsertTask(finalTask);
-      draft.entries.forEach((entry) => upsertEntry(entry));
-    });
+      const taskOk = await upsertTask(finalTask);
+      if (!taskOk) {
+        toast(`Failed to save task "${draft.name}". Submission stopped.`);
+        return;
+      }
+
+      for (const entry of draft.entries) {
+        const entryOk = await upsertEntry(entry);
+        if (!entryOk) {
+          toast(`Failed to save time entry for "${draft.name}". Submission stopped.`);
+          return;
+        }
+      }
+    }
 
     setStagedTasks([]);
     setTaskName('');

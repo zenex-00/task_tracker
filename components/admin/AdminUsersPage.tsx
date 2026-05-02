@@ -182,44 +182,54 @@ export function AdminUsersPage() {
               <tbody>
                 {filteredUsers.length ? (
                   filteredUsers.map((user) => (
-                    <tr key={user.id} onClick={() => onViewProgress(user)} style={{ cursor: 'pointer' }}>
+                    <tr
+                      key={user.id}
+                      onClick={() => {
+                        if (!user.is_admin) onViewProgress(user);
+                      }}
+                      style={{ cursor: user.is_admin ? 'default' : 'pointer' }}
+                    >
                       <td>{`${user.first_name} ${user.last_name}`}</td>
                       <td>{user.email}</td>
                       <td>{user.job_role}</td>
                       <td>{user.is_admin ? 'Admin' : 'User'}</td>
                       <td>
-                        <div className="admin-actions">
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onViewProgress(user);
-                            }}
-                          >
-                            View Progress
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary btn-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openAssignProjects(user);
-                            }}
-                          >
-                            Assign Projects
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-danger-soft"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void onRemoveUser(user);
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </div>
+                        {!user.is_admin ? (
+                          <div className="admin-actions">
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onViewProgress(user);
+                              }}
+                            >
+                              View Progress
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-secondary btn-sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openAssignProjects(user);
+                              }}
+                            >
+                              Assign Projects
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger-soft"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void onRemoveUser(user);
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-muted">-</span>
+                        )}
                       </td>
                     </tr>
                   ))

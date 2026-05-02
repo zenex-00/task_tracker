@@ -96,21 +96,48 @@ export function CompletionReportsPanel() {
                 {attachments.length ? (
                   <div className="progress-attachments">
                     <strong>Attachments</strong>
-                    <ul>
+                    <ul className="report-file-list">
                       {attachments.map((attachment) => {
                         const key = `${attachment.bucket}/${attachment.path}`;
                         const url = attachmentUrls[key] || attachment.publicUrl || '';
                         return (
-                          <li key={key}>
-                            {url ? (
-                              <a href={url} target="_blank" rel="noreferrer">
-                                {attachment.name}
-                              </a>
-                            ) : (
-                              <span>{attachment.name}</span>
-                            )}{' '}
-                            {attachment.fieldName ? <span className="text-muted">[{attachment.fieldName}]</span> : null}{' '}
-                            <span className="text-muted">({formatFileSize(attachment.size)})</span>
+                          <li key={key} className="report-file-item">
+                            <div className="report-file-meta">
+                              <div className="report-file-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none">
+                                  <path
+                                    d="M6.75 3.75h8.5l4 4v12.5a1.5 1.5 0 0 1-1.5 1.5h-11a1.5 1.5 0 0 1-1.5-1.5v-15a1.5 1.5 0 0 1 1.5-1.5Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                  />
+                                  <path d="M15.25 3.75v4h4" stroke="currentColor" strokeWidth="1.5" />
+                                </svg>
+                              </div>
+                              <div className="report-file-text">
+                                <h4>Daily Report</h4>
+                                <p>
+                                  {attachment.name}
+                                  {attachment.fieldName ? ` [${attachment.fieldName}]` : ''} ({formatFileSize(attachment.size)})
+                                </p>
+                              </div>
+                            </div>
+                            <div className="report-file-actions">
+                              {url ? (
+                                <>
+                                  <a href={url} target="_blank" rel="noreferrer" className="report-file-btn report-file-btn-view">
+                                    View
+                                  </a>
+                                  <a href={url} download={attachment.name} className="report-file-btn report-file-btn-download">
+                                    Download
+                                  </a>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="report-file-btn report-file-btn-view is-disabled">View</span>
+                                  <span className="report-file-btn report-file-btn-download is-disabled">Download</span>
+                                </>
+                              )}
+                            </div>
                           </li>
                         );
                       })}
@@ -127,4 +154,3 @@ export function CompletionReportsPanel() {
     </section>
   );
 }
-
