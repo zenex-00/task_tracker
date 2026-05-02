@@ -17,6 +17,17 @@ interface TaskCompletionFormProps {
   onManageUploadFields: () => void;
 }
 
+interface StagedTaskDraft {
+  id: string;
+  name: string;
+  project: string;
+  date: string;
+  totalHours: number;
+  entries: TimeEntry[];
+  dynamicNotes: Record<string, string>;
+  attachments: ReportAttachment[];
+}
+
 const ATTACHMENT_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_UPLOAD_BUCKET || 'task-attachments';
 
 function sanitizeFileName(name: string): string {
@@ -105,14 +116,22 @@ function humanFileSize(bytes: number): string {
 export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onManageUploadFields }: TaskCompletionFormProps) {
   const tasks = useAppStore((s) => s.tasks);
   const projects = useAppStore((s) => s.projects);
+  const assignedProjects = useAppStore((s) => s.assignedProjects);
   const hourTypes = useAppStore((s) => s.hourTypes);
   const noteFields = useAppStore((s) => s.noteFields);
   const uploadFields = useAppStore((s) => s.uploadFields);
   const currentUserId = useAppStore((s) => s.currentUserId);
   const upsertTask = useAppStore((s) => s.upsertTask);
   const upsertEntry = useAppStore((s) => s.upsertEntry);
+
   const [filesByField, setFilesByField] = useState<Record<string, File[]>>({});
   const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState('');
+  const [taskName, setTaskName] = useState('');
+  const [isProgressStep, setIsProgressStep] = useState(false);
+  const [projectProgress, setProjectProgress] = useState(0);
+  const [stagedTasks, setStagedTasks] = useState<StagedTaskDraft[]>([]);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const appendFilesToField = (fieldId: string, incomingFiles: File[], accept: string) => {
@@ -142,64 +161,99 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   };
 
   const selectableProjects = useMemo(() => {
-    const set = new Set<string>(projects);
-    tasks.filter((t) => t.status !== 'Completed').forEach((t) => set.add(t.project));
-    return Array.from(set);
-  }, [projects, tasks]);
-
-  const handleSubmit = async (formData: FormData, form: HTMLFormElement) => {
-    const selectedProject = String(formData.get('completion-task-select') || '');
-    if (!selectedProject) {
-      toast('Please select a project.');
-      return;
+    if (assignedProjects) {
+      const allowed = new Set(assignedProjects);
+      const set = new Set<string>(projects.filter((project) => allowed.has(project)));
+      assignedProjects.forEach((project) => set.add(project));
+      return Array.from(set);
     }
 
-    let task = tasks.find((t) => t.project === selectedProject && t.status !== 'Completed');
-    if (!task) {
-      task = {
-        id: generateId(),
-        name: 'Project Work',
-        project: selectedProject,
-        hoursSpent: 0,
-        priority: 'Medium',
-        status: 'In Progress',
-        dateCompleted: null,
-        createdDate: getTodayStr(),
-        completionReport: null,
-      } as Task;
-      upsertTask(task);
+    const set = new Set<string>(projects);
+    tasks.forEach((t) => set.add(t.project));
+    return Array.from(set);
+  }, [assignedProjects, projects, tasks]);
+
+  const resetTaskInputFields = (form: HTMLFormElement) => {
+    setTaskName('');
+    const dateEl = form.querySelector<HTMLInputElement>('#completion-date');
+    if (dateEl) dateEl.value = getTodayStr();
+    hourTypes.forEach((ht) => {
+      const input = form.querySelector<HTMLInputElement>(`#hr-${ht.code.toLowerCase()}`);
+      if (input) input.value = '0';
+    });
+    noteFields.forEach((_, idx) => {
+      const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#nf-${idx}`);
+      if (field) field.value = '';
+    });
+    uploadFields.forEach((_, idx) => {
+      const fieldId = `af-${idx}`;
+      const fileInput = fileInputRefs.current[fieldId];
+      if (fileInput) fileInput.value = '';
+    });
+    setFilesByField({});
+    setEditingTaskId(null);
+  };
+
+  const loadDraftIntoForm = (form: HTMLFormElement, draft: StagedTaskDraft) => {
+    setSelectedProject(draft.project);
+    setTaskName(draft.name);
+    setEditingTaskId(draft.id);
+    const dateEl = form.querySelector<HTMLInputElement>('#completion-date');
+    if (dateEl) dateEl.value = draft.date || getTodayStr();
+    hourTypes.forEach((ht) => {
+      const input = form.querySelector<HTMLInputElement>(`#hr-${ht.code.toLowerCase()}`);
+      if (!input) return;
+      const entry = draft.entries.find((e) => e.description.startsWith(`${ht.name}:`));
+      input.value = String(entry?.hours || 0);
+    });
+    noteFields.forEach((nf, idx) => {
+      const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#nf-${idx}`);
+      if (field) field.value = draft.dynamicNotes[nf.name] || '';
+    });
+    setFilesByField({});
+  };
+
+  const stageCurrentTask = async (formData: FormData, form: HTMLFormElement): Promise<StagedTaskDraft | null> => {
+    const project = String(formData.get('completion-task-select') || selectedProject).trim();
+    if (!project) {
+      toast('Please select a project.');
+      return null;
+    }
+
+    const rawTaskName = String(formData.get('completion-task-name') || taskName).trim();
+    if (!rawTaskName) {
+      toast('Please enter a task name.');
+      return null;
     }
 
     const date = String(formData.get('completion-date') || getTodayStr());
+    const taskId = editingTaskId || generateId();
 
-    const newEntries: TimeEntry[] = [];
+    const entries: TimeEntry[] = [];
     hourTypes.forEach((ht) => {
       const input = form.querySelector<HTMLInputElement>(`#hr-${ht.code.toLowerCase()}`);
       const hrVal = input ? parseFloat(input.value) || 0 : 0;
       if (hrVal > 0) {
-        newEntries.push({
+        entries.push({
           id: generateId(),
           date,
           hours: hrVal,
-          taskId: task!.id,
+          taskId,
           billable: true,
-          project: task!.project,
-          description: `${ht.name}: ${task!.name}`,
+          project,
+          description: `${ht.name}: ${rawTaskName}`,
         });
       }
     });
 
-    newEntries.forEach((entry) => upsertEntry(entry));
-
-    const totalSubmittedHours = newEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
     const dynamicNotes: Record<string, string> = {};
-    let attachments: ReportAttachment[] = [];
-
     noteFields.forEach((nf, idx) => {
       const el = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#nf-${idx}`);
       if (el) dynamicNotes[nf.name] = el.value;
     });
 
+    let attachments: ReportAttachment[] = [];
     if (uploadFields.length) {
       if (!currentUserId) {
         const hasAnyFile = uploadFields.some((_, idx) => {
@@ -208,7 +262,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
         });
         if (hasAnyFile) {
           toast('Could not upload files because the user session is not ready. Please try again.');
-          return;
+          return null;
         }
       } else {
         try {
@@ -216,68 +270,225 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
             const field = uploadFields[idx];
             const fieldId = `af-${idx}`;
             const files = filesByField[fieldId] || [];
-            if (field.required && !files.length) {
-              toast(`Please upload at least one file for "${field.name}".`);
-              return;
-            }
             if (!files.length) continue;
             const uploadedFiles = await uploadAttachments(files, currentUserId, date, field.name);
             attachments = attachments.concat(uploadedFiles);
           }
         } catch (error) {
           toast(error instanceof Error ? error.message : 'File upload failed. Please try again.');
-          return;
+          return null;
         }
       }
     }
 
-    const nextTask: Task = {
-      ...task,
-      hoursSpent: (task.hoursSpent || 0) + totalSubmittedHours,
-      status: 'Completed',
-      dateCompleted: date,
-      completionReport: {
-        output: dynamicNotes["Today's Output"] || '',
-        blockers: dynamicNotes.Blockers || '',
-        tomorrow: dynamicNotes["Tomorrow's Plan"] || '',
-        link: dynamicNotes['Output Link'] || '',
-        dynamicNotes,
-        attachments,
-      },
+    return {
+      id: taskId,
+      name: rawTaskName,
+      project,
+      date,
+      totalHours,
+      entries,
+      dynamicNotes,
+      attachments,
     };
-
-    upsertTask(nextTask);
-    form.reset();
-    const dateEl = form.querySelector<HTMLInputElement>('#completion-date');
-    if (dateEl) dateEl.value = getTodayStr();
-    hourTypes.forEach((ht) => {
-      const input = form.querySelector<HTMLInputElement>(`#hr-${ht.code.toLowerCase()}`);
-      if (input) input.value = '0';
-    });
-    uploadFields.forEach((_, idx) => {
-      const fieldId = `af-${idx}`;
-      const fileInput = fileInputRefs.current[fieldId];
-      if (fileInput) fileInput.value = '';
-    });
-    setFilesByField({});
-
-    toast('Task completed and report submitted.');
   };
+
+  const handleNextTask = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    const form = event.currentTarget.form;
+    if (!form) return;
+
+    const draft = await stageCurrentTask(new FormData(form), form);
+    if (!draft) return;
+
+    setStagedTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === draft.id);
+      if (idx === -1) return [...prev, draft];
+      const next = [...prev];
+      next[idx] = draft;
+      return next;
+    });
+    setSelectedProject(draft.project);
+    resetTaskInputFields(form);
+    toast(editingTaskId ? 'Task updated. You can add another task.' : 'Task saved temporarily. You can add another task.');
+  };
+
+  const handleFinish = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    const form = event.currentTarget.form;
+    if (!form) return;
+
+    const draft = await stageCurrentTask(new FormData(form), form);
+    if (!draft) return;
+
+    setStagedTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === draft.id);
+      if (idx === -1) return [...prev, draft];
+      const next = [...prev];
+      next[idx] = draft;
+      return next;
+    });
+    setSelectedProject(draft.project);
+    setEditingTaskId(null);
+    setIsProgressStep(true);
+  };
+
+  const handleBackTask = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const form = event.currentTarget.form;
+    if (!form || !stagedTasks.length) return;
+    const currentIdx = editingTaskId ? stagedTasks.findIndex((t) => t.id === editingTaskId) : stagedTasks.length;
+    const previousIdx = Math.max(0, currentIdx - 1);
+    const previous = stagedTasks[previousIdx];
+    loadDraftIntoForm(form, previous);
+    toast(`Editing previous task: "${previous.name}"`);
+  };
+
+  const handleSubmitFullReport = async () => {
+    if (!selectedProject) {
+      toast('Please select a project first.');
+      setIsProgressStep(false);
+      return;
+    }
+
+    const projectTasks = stagedTasks.filter((task) => task.project === selectedProject);
+    if (!projectTasks.length) {
+      toast('Please add at least one task before submitting.');
+      setIsProgressStep(false);
+      return;
+    }
+
+    const userRes = await supabase.auth.getUser();
+    const user = userRes.data.user;
+    const submittedAt = new Date().toISOString();
+
+    projectTasks.forEach((draft) => {
+      const finalTask: Task = {
+        id: draft.id,
+        name: draft.name,
+        project: draft.project,
+        hoursSpent: draft.totalHours,
+        priority: 'Medium',
+        status: 'Completed',
+        dateCompleted: draft.date,
+        createdDate: getTodayStr(),
+        completionReport: {
+          output: draft.dynamicNotes["Today's Output"] || '',
+          blockers: draft.dynamicNotes.Blockers || '',
+          tomorrow: draft.dynamicNotes["Tomorrow's Plan"] || '',
+          link: draft.dynamicNotes['Output Link'] || '',
+          dynamicNotes: {
+            ...draft.dynamicNotes,
+            '__selectedProject': selectedProject,
+            '__overallProgress': `${projectProgress}%`,
+            '__submissionTime': submittedAt,
+            '__submittedBy': user?.email || user?.id || 'Unknown User',
+            '__reportTaskCount': String(projectTasks.length),
+            '__reportTaskNames': projectTasks.map((t) => t.name).join(', '),
+          },
+          attachments: draft.attachments,
+        },
+      };
+
+      upsertTask(finalTask);
+      draft.entries.forEach((entry) => upsertEntry(entry));
+    });
+
+    setStagedTasks([]);
+    setTaskName('');
+    setProjectProgress(0);
+    setIsProgressStep(false);
+
+    toast('Final report submitted with all staged tasks and project progress.');
+  };
+
+  if (isProgressStep) {
+    const projectTasks = stagedTasks.filter((task) => task.project === selectedProject);
+    const totalInvestedHours = projectTasks.reduce((sum, t) => sum + t.totalHours, 0);
+    const estimatedRemainingHours = projectProgress > 0 ? (totalInvestedHours * (100 - projectProgress)) / projectProgress : 0;
+    const progressTone = projectProgress < 34 ? 'Started' : projectProgress < 80 ? 'In Progress' : 'Near Completion';
+    const progressBg = `linear-gradient(90deg, #0a84ff 0%, #0a84ff ${projectProgress}%, #d9e4f5 ${projectProgress}%, #d9e4f5 100%)`;
+    const formatHours = (value: number) => {
+      const totalMinutes = Math.max(0, Math.round(value * 60));
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      return `${hours}h ${minutes}m`;
+    };
+    return (
+      <div className="progress-milestone-card">
+        <div className="progress-top-row">
+          <div>
+            <p className="progress-kicker">Current Milestone</p>
+            <h3 className="progress-title">{selectedProject} Progress</h3>
+            <p className="progress-subtle-state">{progressTone}</p>
+          </div>
+          <span className="progress-pill">{projectProgress}% Done</span>
+        </div>
+        <div className="progress-slider-block">
+          <div className="progress-label-row">
+            <label htmlFor="project-progress-range" className="progress-label">
+              Overall Progress
+            </label>
+            <span className="progress-value-chip">{projectProgress}%</span>
+          </div>
+          <div className="progress-range-wrap">
+            <input
+              className="progress-range"
+              style={{ background: progressBg }}
+              id="project-progress-range"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={projectProgress}
+              onChange={(e) => setProjectProgress(parseInt(e.target.value, 10) || 0)}
+            />
+          </div>
+        </div>
+        <div className="progress-stages">
+          <span>Started</span>
+          <span>In Progress</span>
+          <span>Completed</span>
+        </div>
+        <div className="progress-metrics">
+          <div>
+            <span className="metric-label">Time Invested</span>
+            <strong>{formatHours(totalInvestedHours)}</strong>
+          </div>
+          <div>
+            <span className="metric-label">Estimated Remainder</span>
+            <strong>{projectProgress === 0 ? '--' : formatHours(estimatedRemainingHours)}</strong>
+          </div>
+        </div>
+        <p className="section-subtitle" style={{ marginTop: '0.75rem' }}>
+          Tasks in this report: <strong>{projectTasks.length}</strong>
+        </p>
+        <div className="task-form-actions mt-4">
+          <button type="button" className="btn-add-task btn-large w-full" onClick={() => setIsProgressStep(false)}>
+            Back to Tasks
+          </button>
+          <button type="button" className="btn-submit-report btn-large w-full" onClick={handleSubmitFullReport}>
+            Finish & Submit Report
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
       id="form-task-completion"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        const form = event.currentTarget;
-        const fd = new FormData(form);
-        await handleSubmit(fd, form);
       }}
     >
       <div className="form-row">
         <div className="form-group">
           <label htmlFor="completion-task-select">Select Project</label>
-          <select id="completion-task-select" name="completion-task-select" required defaultValue="">
+          <select
+            id="completion-task-select"
+            name="completion-task-select"
+            required
+            value={selectedProject}
+            onChange={(e) => setSelectedProject(e.target.value)}
+          >
             <option value="" disabled>
               Choose a project
             </option>
@@ -287,7 +498,25 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
               </option>
             ))}
           </select>
+          {assignedProjects && selectableProjects.length === 0 ? (
+            <small className="attachments-help">No project has been assigned to your account yet. Contact an admin.</small>
+          ) : null}
         </div>
+        <div className="form-group">
+          <label htmlFor="completion-task-name">Create New Task</label>
+          <input
+            id="completion-task-name"
+            name="completion-task-name"
+            type="text"
+            value={taskName}
+            onChange={(e) => setTaskName(e.target.value)}
+            placeholder="Enter task name"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="form-row">
         <div className="form-group">
           <label htmlFor="completion-date">Date</label>
           <input id="completion-date" name="completion-date" type="date" defaultValue={getTodayStr()} required />
@@ -305,9 +534,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
         </div>
         {uploadFields.map((field: UploadField, idx: number) => (
           <div key={`${field.name}-${idx}`} className="form-group">
-            <label htmlFor={`af-${idx}`}>
-              {field.name} {field.required ? '*' : ''}
-            </label>
+            <label htmlFor={`af-${idx}`}>{field.name} (Optional)</label>
             <div
               className={`file-dropzone file-dropzone-clickable ${dragOverFieldId === `af-${idx}` ? 'is-dragover' : ''}`}
               onDragOver={(e) => {
@@ -388,15 +615,28 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
         ))}
       </div>
 
-      <button type="submit" className="btn-primary btn-large w-full mt-4">
-        <span className="btn-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V7l4-4h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2z" />
-            <polyline points="17 21 17 13 7 13 7 21" />
-          </svg>
-        </span>
-        Submit Completion Report
-      </button>
+      <div className="task-actions-row mt-4">
+        <button
+          type="button"
+          className="btn-ghost task-back-btn"
+          onClick={handleBackTask}
+          disabled={stagedTasks.length === 0}
+          aria-disabled={stagedTasks.length === 0}
+        >
+          Back
+        </button>
+        <div className="task-form-actions">
+          <button type="button" className="btn-add-task btn-large" onClick={handleNextTask}>
+            <span className="plus-circle" aria-hidden="true">
+              +
+            </span>
+            Add Another Task
+          </button>
+          <button type="button" className="btn-submit-report btn-large" onClick={handleFinish}>
+            Finish & Submit Report
+          </button>
+        </div>
+      </div>
     </form>
   );
 }

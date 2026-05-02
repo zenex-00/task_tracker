@@ -13,6 +13,17 @@ type CreateUserBody = {
   role?: TeamRole;
 };
 
+type UpdateUserProjectsBody = {
+  userId?: string;
+  projects?: string[];
+};
+
+function isMissingProjectsColumnError(message?: string): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return lower.includes('projects') && (lower.includes('column') || lower.includes('schema cache'));
+}
+
 async function verifyAdmin() {
   let supabase;
   try {
@@ -41,7 +52,12 @@ async function verifyAdmin() {
     .eq('id', userData.user.id)
     .maybeSingle<{ is_admin: boolean }>();
 
-  if (profileError || !profile?.is_admin) {
+  const isAdminFromClaims =
+    userData.user.app_metadata?.is_admin === true ||
+    userData.user.user_metadata?.is_admin === true;
+  const isAdmin = Boolean(profile?.is_admin) || isAdminFromClaims;
+
+  if (profileError || !isAdmin) {
     return { ok: false as const, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
@@ -66,8 +82,25 @@ export async function GET() {
 
   const { data, error } = await adminClient
     .from('user_profiles')
-    .select('id, email, first_name, last_name, job_role, is_admin, created_at')
+    .select('id, email, first_name, last_name, job_role, is_admin, projects, created_at')
     .order('created_at', { ascending: false });
+
+  if (error && isMissingProjectsColumnError(error.message)) {
+    const fallbackRes = await adminClient
+      .from('user_profiles')
+      .select('id, email, first_name, last_name, job_role, is_admin, created_at')
+      .order('created_at', { ascending: false });
+
+    if (fallbackRes.error) {
+      return NextResponse.json({ error: fallbackRes.error.message || 'Failed to fetch users' }, { status: 500 });
+    }
+
+    const usersWithoutProjects = ((fallbackRes.data || []) as UserProfile[]).map((user) => ({
+      ...user,
+      projects: null,
+    }));
+    return NextResponse.json({ users: usersWithoutProjects });
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message || 'Failed to fetch users' }, { status: 500 });
@@ -134,21 +167,91 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: userError?.message || 'Failed to create auth user.' }, { status: 500 });
   }
 
-  const { error: profileError } = await adminClient.from('user_profiles').upsert({
+  const profilePayload = {
     id: userResult.user.id,
     email,
     first_name: firstName,
     last_name: lastName,
     job_role: role,
     is_admin: isAdmin,
-  });
+    projects: null,
+  };
+
+  const { error: profileError } = await adminClient.from('user_profiles').upsert(profilePayload);
 
   if (profileError) {
+    if (isMissingProjectsColumnError(profileError.message)) {
+      const { error: legacyProfileError } = await adminClient.from('user_profiles').upsert({
+        id: userResult.user.id,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        job_role: role,
+        is_admin: isAdmin,
+      });
+
+      if (!legacyProfileError) {
+        return NextResponse.json({ success: true }, { status: 201 });
+      }
+    }
     await adminClient.auth.admin.deleteUser(userResult.user.id);
     return NextResponse.json({ error: profileError.message || 'Failed to create profile.' }, { status: 500 });
   }
 
   return NextResponse.json({ success: true }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const guard = await verifyAdmin();
+  if (!guard.ok) {
+    return guard.response;
+  }
+
+  let body: UpdateUserProjectsBody;
+  try {
+    body = (await request.json()) as UpdateUserProjectsBody;
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const userId = body.userId?.trim() || '';
+  if (!userId) {
+    return NextResponse.json({ error: 'User id is required.' }, { status: 400 });
+  }
+
+  if (!Array.isArray(body.projects)) {
+    return NextResponse.json({ error: 'Projects must be an array.' }, { status: 400 });
+  }
+
+  const cleanProjects = [...new Set(body.projects.map((project) => project.trim()).filter(Boolean))];
+
+  let adminClient;
+  try {
+    adminClient = createAdminClient();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Missing admin configuration.' },
+      { status: 500 },
+    );
+  }
+
+  const { error } = await adminClient
+    .from('user_profiles')
+    .update({ projects: cleanProjects })
+    .eq('id', userId);
+
+  if (error && isMissingProjectsColumnError(error.message)) {
+    return NextResponse.json(
+      { error: 'Projects assignment is unavailable until the `user_profiles.projects` migration is applied.' },
+      { status: 400 },
+    );
+  }
+
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to update user projects.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: Request) {

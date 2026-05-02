@@ -60,6 +60,7 @@ model UserProfile {
   lastName  String   @map("last_name")
   jobRole   String   @map("job_role")
   isAdmin   Boolean  @default(false) @map("is_admin")
+  projects  String[] @default([])
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 

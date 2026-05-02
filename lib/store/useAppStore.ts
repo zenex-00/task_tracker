@@ -134,6 +134,7 @@ export const useAppStore = create<AppStore>((set, get) => {
   timeEntries: [],
   currentUserId: null,
   projects: DEFAULT_PROJECTS,
+  assignedProjects: null,
   hourTypes: DEFAULT_HOUR_TYPES,
   noteFields: DEFAULT_NOTE_FIELDS,
   uploadFields: DEFAULT_UPLOAD_FIELDS,
@@ -160,10 +161,11 @@ export const useAppStore = create<AppStore>((set, get) => {
 
       const currentUserId = authData.user.id;
 
-      const [tasksRes, entriesRes, settingsRes] = await Promise.all([
+      const [tasksRes, entriesRes, settingsRes, profileRes] = await Promise.all([
         supabase.from('tasks').select('*').eq('user_id', currentUserId).order('created_date', { ascending: false }),
         supabase.from('time_entries').select('*').eq('user_id', currentUserId).order('date', { ascending: false }),
         supabase.from('settings').select('*').eq('id', 1).single(),
+        supabase.from('user_profiles').select('is_admin, projects').eq('id', currentUserId).maybeSingle<{ is_admin: boolean; projects: string[] | null }>(),
       ]);
 
       if (tasksRes.error) throw tasksRes.error;
@@ -177,6 +179,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         weeklyHourTarget: settings?.weekly_hour_target ?? DEFAULT_SETTINGS.weeklyHourTarget,
         monthlyTaskTarget: settings?.monthly_task_target ?? DEFAULT_SETTINGS.monthlyTaskTarget,
       };
+      const assignedProjects = profileRes.error || profileRes.data?.is_admin ? null : (profileRes.data?.projects ?? null);
 
       const projects = settings?.projects?.length ? settings.projects : get().projects;
       const hourTypes = settings?.hour_types?.length ? settings.hour_types : get().hourTypes;
@@ -194,6 +197,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         currentUserId,
         settings: nextSettings,
         projects,
+        assignedProjects,
         hourTypes,
         noteFields,
         uploadFields,

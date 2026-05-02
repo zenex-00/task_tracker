@@ -89,6 +89,7 @@ export interface AppState {
   tasks: Task[];
   timeEntries: TimeEntry[];
   projects: string[];
+  assignedProjects: string[] | null;
   hourTypes: HourType[];
   noteFields: NoteField[];
   uploadFields: UploadField[];
@@ -138,5 +139,6 @@ export interface UserProfile {
   last_name: string;
   job_role: TeamRole;
   is_admin: boolean;
+  projects?: string[] | null;
   created_at?: string;
 }

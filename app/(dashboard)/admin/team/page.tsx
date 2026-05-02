@@ -55,7 +55,7 @@ function normalizeProject(value: string | null): string {
 export default async function AdminTeamPage({
   searchParams,
 }: {
-  searchParams: { project?: string | string[] };
+  searchParams: Promise<{ project?: string | string[] }>;
 }) {
   const currentUser = await getCurrentUserWithProfile();
 
@@ -164,7 +164,8 @@ export default async function AdminTeamPage({
   }
 
   const projects = [...projectMap.values()].sort((a, b) => b.totalHours - a.totalHours);
-  const requestedProject = Array.isArray(searchParams.project) ? searchParams.project[0] : searchParams.project;
+  const resolvedSearchParams = await searchParams;
+  const requestedProject = Array.isArray(resolvedSearchParams.project) ? resolvedSearchParams.project[0] : resolvedSearchParams.project;
   const selectedProject = requestedProject && projectMap.has(requestedProject) ? requestedProject : projects[0]?.project;
 
   const memberMap = new Map<string, TeamMemberSummary>();

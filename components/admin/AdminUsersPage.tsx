@@ -4,15 +4,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+import { Modal } from '@/components/ui/Modal';
+import { useAppStore } from '@/lib/store/useAppStore';
 import type { UserProfile } from '@/types';
 
 interface UserListItem extends UserProfile {}
 
 export function AdminUsersPage() {
   const router = useRouter();
+  const projects = useAppStore((s) => s.projects);
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [search, setSearch] = useState('');
+  const [assigningUser, setAssigningUser] = useState<UserListItem | null>(null);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [isSavingAssignments, setIsSavingAssignments] = useState(false);
 
   const loadUsers = async () => {
     setIsLoadingUsers(true);
@@ -75,6 +81,44 @@ export function AdminUsersPage() {
 
   const onViewProgress = (user: UserListItem) => {
     router.push(`/admin/users/${user.id}/progress`);
+  };
+
+  const openAssignProjects = (user: UserListItem) => {
+    setAssigningUser(user);
+    setSelectedProjects(user.projects || []);
+  };
+
+  const toggleProjectSelection = (project: string) => {
+    setSelectedProjects((prev) => (prev.includes(project) ? prev.filter((item) => item !== project) : [...prev, project]));
+  };
+
+  const onSaveProjectAssignments = async () => {
+    if (!assigningUser) return;
+
+    setIsSavingAssignments(true);
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: assigningUser.id, projects: selectedProjects }),
+      });
+
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to assign projects.');
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((user) => (user.id === assigningUser.id ? { ...user, projects: [...selectedProjects] } : user)),
+      );
+      toast.success('Projects assigned successfully.');
+      setAssigningUser(null);
+    } catch {
+      toast.error('Network error while assigning projects.');
+    } finally {
+      setIsSavingAssignments(false);
+    }
   };
 
   return (
@@ -157,6 +201,16 @@ export function AdminUsersPage() {
                           </button>
                           <button
                             type="button"
+                            className="btn-secondary btn-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openAssignProjects(user);
+                            }}
+                          >
+                            Assign Projects
+                          </button>
+                          <button
+                            type="button"
                             className="btn-danger-soft"
                             onClick={(event) => {
                               event.stopPropagation();
@@ -179,6 +233,42 @@ export function AdminUsersPage() {
           </div>
         )}
       </section>
+
+      <Modal
+        isOpen={Boolean(assigningUser)}
+        onClose={() => {
+          if (isSavingAssignments) return;
+          setAssigningUser(null);
+        }}
+        title={assigningUser ? `Assign Projects: ${assigningUser.first_name} ${assigningUser.last_name}` : 'Assign Projects'}
+      >
+        <div className="projects-list">
+          {projects.length ? (
+            projects.map((project) => (
+              <label key={project} className="project-assignment-row">
+                <input
+                  type="checkbox"
+                  checked={selectedProjects.includes(project)}
+                  onChange={() => toggleProjectSelection(project)}
+                />
+                <span>{project}</span>
+              </label>
+            ))
+          ) : (
+            <p className="text-muted">No projects available. Create projects first from Admin Projects.</p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="btn-primary btn-large w-full mt-4"
+          disabled={isSavingAssignments}
+          onClick={() => {
+            void onSaveProjectAssignments();
+          }}
+        >
+          {isSavingAssignments ? 'Saving...' : 'Save Assignments'}
+        </button>
+      </Modal>
     </section>
   );
 }

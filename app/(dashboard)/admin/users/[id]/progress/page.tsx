@@ -75,7 +75,7 @@ async function resolveReportAttachments(adminClient: ReturnType<typeof createAdm
   }));
 }
 
-export default async function AdminUserProgressPage({ params }: { params: { id: string } }) {
+export default async function AdminUserProgressPage({ params }: { params: Promise<{ id: string }> }) {
   const currentUser = await getCurrentUserWithProfile();
 
   if (!currentUser) {
@@ -104,7 +104,7 @@ export default async function AdminUserProgressPage({ params }: { params: { id: 
       </section>
     );
   }
-  const userId = params.id;
+  const { id: userId } = await params;
 
   const { data: userProfile, error: userError } = await adminClient
     .from('user_profiles')
