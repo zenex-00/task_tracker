@@ -11,6 +11,7 @@ type AutoTableOptions = {
   headStyles: Record<string, unknown>;
   styles: Record<string, unknown>;
   columnStyles?: Record<number, Record<string, unknown>>;
+  didDrawCell?: (data: any) => void;
   margin: { left: number; right: number };
 };
 
@@ -68,8 +69,29 @@ function pushNote(notes: string[], label: string, value: string): void {
 
 function renderCellProgress(value?: number): string {
   const bounded = Math.max(0, Math.min(100, Number(value) || 0));
-  const active = Math.round(bounded / 10);
-  return `${'■'.repeat(active)}${'□'.repeat(10 - active)}`;
+  return `${bounded.toFixed(0)}%`;
+}
+
+function drawProgressBarCell(doc: JsPdfDoc, cell: any, rawValue: unknown): void {
+  const parsed = Number.parseFloat(String(rawValue ?? '0').replace('%', ''));
+  const progress = Math.max(0, Math.min(100, Number.isFinite(parsed) ? parsed : 0));
+
+  const paddingX = 2.2;
+  const barH = Math.max(2.6, cell.height * 0.34);
+  const barY = cell.y + (cell.height - barH) / 2;
+  const barX = cell.x + paddingX;
+  const barW = Math.max(8, cell.width - paddingX * 2);
+  const fillW = (barW * progress) / 100;
+
+  doc.setFillColor(226, 232, 240);
+  doc.roundedRect(barX, barY, barW, barH, 1, 1, 'F');
+  doc.setFillColor(37, 99, 235);
+  doc.roundedRect(barX, barY, fillW, barH, 1, 1, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${progress.toFixed(0)}%`, cell.x + cell.width - 2.4, cell.y + cell.height / 2 + 1.2, { align: 'right' });
 }
 export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
@@ -238,11 +260,17 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
     doc.text('Project Progress Snapshot', margin, cursorY);
     doc.autoTable({
       startY: cursorY + 3,
-      head: [['Project', 'Progress Cells']],
+      head: [['Project', 'Progress']],
       body: projectProgressRows,
       theme: 'striped',
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
+      columnStyles: { 1: { cellWidth: 60 } },
+      didDrawCell: (data: any) => {
+        if (data.section === 'body' && data.column?.index === 1) {
+          drawProgressBarCell(doc, data.cell, data.cell.raw);
+        }
+      },
       margin: { left: margin, right: margin },
     });
     cursorY = doc.lastAutoTable.finalY + 8;
@@ -319,6 +347,11 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
       headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 8.5, textColor: [15, 23, 42], cellPadding: 2.1, valign: 'top' },
       columnStyles: { 3: { cellWidth: 32 }, 4: { cellWidth: 56 } },
+      didDrawCell: (data: any) => {
+        if (data.section === 'body' && data.column?.index === 3) {
+          drawProgressBarCell(doc, data.cell, data.cell.raw);
+        }
+      },
       margin: { left: margin, right: margin },
     });
   } else {
@@ -339,3 +372,4 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
 
   return { blob, fileName };
 }
+
