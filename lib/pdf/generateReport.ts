@@ -11,6 +11,7 @@ type AutoTableOptions = {
   headStyles: Record<string, unknown>;
   styles: Record<string, unknown>;
   columnStyles?: Record<number, Record<string, unknown>>;
+  didParseCell?: (data: any) => void;
   didDrawCell?: (data: any) => void;
   margin: { left: number; right: number };
 };
@@ -75,23 +76,47 @@ function renderCellProgress(value?: number): string {
 function drawProgressBarCell(doc: JsPdfDoc, cell: any, rawValue: unknown): void {
   const parsed = Number.parseFloat(String(rawValue ?? '0').replace('%', ''));
   const progress = Math.max(0, Math.min(100, Number.isFinite(parsed) ? parsed : 0));
-
+  const segments = 10;
+  const filledSegments = Math.round(progress / 10);
   const paddingX = 2.2;
-  const barH = Math.max(2.6, cell.height * 0.34);
+  const percentLabelW = 11;
+  const gap = 0.9;
+  const barH = Math.max(2.8, cell.height * 0.4);
   const barY = cell.y + (cell.height - barH) / 2;
   const barX = cell.x + paddingX;
-  const barW = Math.max(8, cell.width - paddingX * 2);
-  const fillW = (barW * progress) / 100;
+  const barW = Math.max(8, cell.width - paddingX * 2 - percentLabelW);
+  const segmentW = Math.max(1.2, (barW - gap * (segments - 1)) / segments);
 
-  doc.setFillColor(226, 232, 240);
-  doc.roundedRect(barX, barY, barW, barH, 1, 1, 'F');
-  doc.setFillColor(37, 99, 235);
-  doc.roundedRect(barX, barY, fillW, barH, 1, 1, 'F');
+  for (let i = 0; i < segments; i += 1) {
+    const segX = barX + i * (segmentW + gap);
+    if (i < filledSegments) {
+      doc.setFillColor(37, 99, 235);
+      doc.roundedRect(segX, barY, segmentW, barH, 0.7, 0.7, 'F');
+    } else {
+      doc.setFillColor(226, 232, 240);
+      doc.roundedRect(segX, barY, segmentW, barH, 0.7, 0.7, 'F');
+    }
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text(`${progress.toFixed(0)}%`, cell.x + cell.width - 2.4, cell.y + cell.height / 2 + 1.2, { align: 'right' });
+  doc.text(`${progress.toFixed(0)}%`, cell.x + cell.width - 2.2, cell.y + cell.height / 2 + 1.2, { align: 'right' });
+}
+
+function hasCompletionReportContent(report: Task['completionReport']): boolean {
+  if (!report) return false;
+  const dynamicValues = Object.entries(report.dynamicNotes || {})
+    .filter(([k]) => !k.startsWith('__'))
+    .map(([, v]) => String(v || '').trim())
+    .filter(Boolean);
+  if (dynamicValues.length > 0) return true;
+  if (String(report.output || '').trim()) return true;
+  if (String(report.blockers || '').trim()) return true;
+  if (String(report.tomorrow || '').trim()) return true;
+  if (String(report.link || '').trim()) return true;
+  if ((report.attachments || []).length > 0) return true;
+  return false;
 }
 export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
@@ -266,6 +291,11 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
       columnStyles: { 1: { cellWidth: 60 } },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column?.index === 1) {
+          data.cell.text = [''];
+        }
+      },
       didDrawCell: (data: any) => {
         if (data.section === 'body' && data.column?.index === 1) {
           drawProgressBarCell(doc, data.cell, data.cell.raw);
@@ -301,7 +331,7 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
     cursorY += 12;
   }
 
-  const completedTasksWithReports = filteredTasks.filter((t) => t.status === 'Completed' && t.completionReport);
+  const completedTasksWithReports = filteredTasks.filter((t) => hasCompletionReportContent(t.completionReport));
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -329,7 +359,10 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
           if (k.startsWith('__')) return;
           if (!consumed.has(k)) pushNote(notes, normalizeLabel(k), report.dynamicNotes[k]);
         });
-      } else {
+      }
+
+      // Fallback to legacy completion fields when dynamic notes are missing/empty.
+      if (notes.length === 0) {
         pushNote(notes, "Today's Output", report?.output || '');
         pushNote(notes, 'Blockers', report?.blockers || '');
         pushNote(notes, "Tomorrow's Plan", report?.tomorrow || '');
@@ -347,6 +380,11 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
       headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 8.5, textColor: [15, 23, 42], cellPadding: 2.1, valign: 'top' },
       columnStyles: { 3: { cellWidth: 32 }, 4: { cellWidth: 56 } },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.column?.index === 3) {
+          data.cell.text = [''];
+        }
+      },
       didDrawCell: (data: any) => {
         if (data.section === 'body' && data.column?.index === 3) {
           drawProgressBarCell(doc, data.cell, data.cell.raw);
