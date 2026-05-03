@@ -69,9 +69,8 @@ function pushNote(notes: string[], label: string, value: string): void {
 function renderCellProgress(value?: number): string {
   const bounded = Math.max(0, Math.min(100, Number(value) || 0));
   const active = Math.round(bounded / 10);
-  return `[${'#'.repeat(active)}${'.'.repeat(10 - active)}]`;
+  return `${'■'.repeat(active)}${'□'.repeat(10 - active)}`;
 }
-
 export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const jsPDF = (jsPdfMod as any).default || (jsPdfMod as any).jsPDF;
@@ -215,30 +214,6 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
       columnStyles: { 1: { halign: 'right' } },
-      margin: { left: margin, right: margin },
-    });
-    cursorY = doc.lastAutoTable.finalY + 8;
-  }
-
-  const taskProgressRows = filteredTasks
-    .filter((task) => task.completionReport)
-    .map((task) => ({
-      project: task.project || '-',
-      task: task.name || '-',
-      cells: renderCellProgress(task.completionReport?.taskProgress),
-    }));
-  if (taskProgressRows.length > 0) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(15, 23, 42);
-    doc.text('Task Progress Snapshot', margin, cursorY);
-    doc.autoTable({
-      startY: cursorY + 3,
-      head: [['Project', 'Task', 'Progress Cells']],
-      body: taskProgressRows.map((row) => [row.project, row.task, row.cells]),
-      theme: 'striped',
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
-      styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
       margin: { left: margin, right: margin },
     });
     cursorY = doc.lastAutoTable.finalY + 8;

@@ -130,6 +130,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState('');
   const [taskName, setTaskName] = useState('');
+  const [selectedExistingTaskId, setSelectedExistingTaskId] = useState('');
   const [isProgressStep, setIsProgressStep] = useState(false);
   const [projectProgress, setProjectProgress] = useState(0);
   const [taskProgress, setTaskProgress] = useState(0);
@@ -176,8 +177,25 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
     return Array.from(set);
   }, [assignedProjects, projects, tasks]);
 
+  const existingTasksForProject = useMemo(() => {
+    const filtered = tasks.filter((t) => (selectedProject ? t.project === selectedProject : true));
+    const deduped = new Map<string, { id: string; name: string; progress: number; marker: string }>();
+    filtered.forEach((task) => {
+      const key = task.name.trim().toLowerCase();
+      if (!key) return;
+      const marker = task.dateCompleted || task.createdDate || '';
+      const progress = task.completionReport?.taskProgress ?? 0;
+      const current = deduped.get(key);
+      if (!current || marker >= current.marker) {
+        deduped.set(key, { id: task.id, name: task.name, progress, marker });
+      }
+    });
+    return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks, selectedProject]);
+
   const resetTaskInputFields = (form: HTMLFormElement) => {
     setTaskName('');
+    setSelectedExistingTaskId('');
     const dateEl = form.querySelector<HTMLInputElement>('#completion-date');
     if (dateEl) dateEl.value = getTodayStr();
     hourTypes.forEach((ht) => {
@@ -201,6 +219,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   const loadDraftIntoForm = (form: HTMLFormElement, draft: StagedTaskDraft) => {
     setSelectedProject(draft.project);
     setTaskName(draft.name);
+    setSelectedExistingTaskId('');
     setEditingTaskId(draft.id);
     const dateEl = form.querySelector<HTMLInputElement>('#completion-date');
     if (dateEl) dateEl.value = draft.date || getTodayStr();
@@ -497,12 +516,37 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
         </div>
         <div className="form-group">
           <label htmlFor="completion-task-name">Create New Task</label>
+          <select
+            id="completion-existing-task"
+            name="completion-existing-task"
+            value={selectedExistingTaskId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedExistingTaskId(id);
+              if (!id) return;
+              const selected = existingTasksForProject.find((item) => item.id === id);
+              if (!selected) return;
+              setTaskName(selected.name);
+              setTaskProgress(selected.progress);
+            }}
+            style={{ marginBottom: '8px' }}
+          >
+            <option value="">Select existing task (optional)</option>
+            {existingTasksForProject.map((task) => (
+              <option key={task.id} value={task.id}>
+                {task.name}
+              </option>
+            ))}
+          </select>
           <input
             id="completion-task-name"
             name="completion-task-name"
             type="text"
             value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
+            onChange={(e) => {
+              setTaskName(e.target.value);
+              if (selectedExistingTaskId) setSelectedExistingTaskId('');
+            }}
             placeholder="Enter task name"
             required
           />
@@ -521,6 +565,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       <div className="progress-slider-block progress-cell-block mt-4">
         <div className="progress-label-row">
           <label className="progress-label">Task Progress</label>
+          <span className="progress-value-chip">{taskProgress}%</span>
         </div>
         <CellProgressBar ariaLabel="Task progress" value={taskProgress} onChange={setTaskProgress} />
       </div>
