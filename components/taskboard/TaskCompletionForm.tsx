@@ -428,7 +428,6 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   if (isProgressStep) {
     const projectTasks = stagedTasks.filter((task) => task.project === selectedProject);
     const totalInvestedHours = projectTasks.reduce((sum, t) => sum + t.totalHours, 0);
-    const estimatedRemainingHours = projectProgress > 0 ? (totalInvestedHours * (100 - projectProgress)) / projectProgress : 0;
     const progressTone = projectProgress < 34 ? 'Started' : projectProgress < 80 ? 'In Progress' : 'Near Completion';
     const formatHours = (value: number) => {
       const totalMinutes = Math.max(0, Math.round(value * 60));
@@ -463,10 +462,6 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
           <div>
             <span className="metric-label">Time Invested</span>
             <strong>{formatHours(totalInvestedHours)}</strong>
-          </div>
-          <div>
-            <span className="metric-label">Estimated Remainder</span>
-            <strong>{projectProgress === 0 ? '--' : formatHours(estimatedRemainingHours)}</strong>
           </div>
         </div>
         <p className="section-subtitle" style={{ marginTop: '0.75rem' }}>

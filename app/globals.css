@@ -1202,7 +1202,7 @@ tr:last-child td {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 24, 38, 0.28);
+  background: rgba(15, 24, 38, 0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -1211,7 +1211,7 @@ tr:last-child td {
   width: min(92vw, 560px);
   border-radius: var(--radius-lg);
   border: var(--border);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.42));
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.8));
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(30px) saturate(160%);
   -webkit-backdrop-filter: blur(30px) saturate(160%);
