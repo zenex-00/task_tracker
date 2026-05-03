@@ -9,6 +9,9 @@ type TaskRow = {
   project: string | null;
   hours_spent: number | string | null;
   status: string | null;
+  completion_report?: {
+    taskProgress?: number;
+  } | null;
 };
 
 type TimeEntryRow = {
@@ -52,6 +55,12 @@ function normalizeProject(value: string | null): string {
   return trimmed ? trimmed : 'General';
 }
 
+function isTaskCompleted(task: TaskRow): boolean {
+  const progress = task.completion_report?.taskProgress;
+  if (typeof progress === 'number' && Number.isFinite(progress)) return progress >= 100;
+  return task.status === 'Completed';
+}
+
 export default async function AdminTeamPage({
   searchParams,
 }: {
@@ -88,7 +97,7 @@ export default async function AdminTeamPage({
 
   const { data: taskRows, error: taskError } = await adminClient
     .from('tasks')
-    .select('user_id, project, hours_spent, status');
+    .select('user_id, project, hours_spent, status, completion_report');
 
   const { data: entryRows, error: entryError } = await adminClient
     .from('time_entries')
@@ -141,7 +150,7 @@ export default async function AdminTeamPage({
 
     current.totalTasks += 1;
     current.totalHours += parseHours(task.hours_spent);
-    if (task.status === 'Completed') current.completedTasks += 1;
+    if (isTaskCompleted(task)) current.completedTasks += 1;
     if (task.user_id) current.users.add(task.user_id);
     projectMap.set(project, current);
   }
@@ -200,7 +209,7 @@ export default async function AdminTeamPage({
         completedTasks: 0,
       };
       current.tasks += 1;
-      if (task.status === 'Completed') current.completedTasks += 1;
+      if (isTaskCompleted(task)) current.completedTasks += 1;
       memberMap.set(task.user_id, current);
     }
   }

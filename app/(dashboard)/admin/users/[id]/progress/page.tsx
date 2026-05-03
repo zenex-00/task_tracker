@@ -38,6 +38,16 @@ function parseHours(value: number | string | null | undefined): number {
   return Number.parseFloat(String(value ?? 0)) || 0;
 }
 
+function deriveTaskStatus(task: TaskProgressRow): 'Completed' | 'In Progress' | 'Not Started' {
+  const progress = task.completion_report?.taskProgress;
+  if (typeof progress === 'number' && Number.isFinite(progress)) {
+    return progress >= 100 ? 'Completed' : 'In Progress';
+  }
+  if (task.status === 'Completed') return 'Completed';
+  if (task.status === 'In Progress') return 'In Progress';
+  return 'Not Started';
+}
+
 async function resolveReportAttachments(adminClient: ReturnType<typeof createAdminClient>, attachments: ReportAttachment[]) {
   if (!attachments.length) return [];
 
@@ -139,7 +149,7 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
   const entries = (entriesData || []) as TimeEntryProgressRow[];
 
   const totalHours = entries.reduce((sum, entry) => sum + parseHours(entry.hours), 0);
-  const completedTasks = tasks.filter((task) => task.status === 'Completed').length;
+  const completedTasks = tasks.filter((task) => deriveTaskStatus(task) === 'Completed').length;
   const reports = tasks.filter((task) => task.completion_report);
   const reportsWithAttachments = await Promise.all(
     reports.map(async (task) => {
@@ -155,8 +165,8 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
     project: task.project || 'General',
     hoursSpent: parseHours(task.hours_spent),
     priority: 'Medium',
-    status: task.status === 'Completed' ? 'Completed' : task.status === 'In Progress' ? 'In Progress' : 'Not Started',
-    dateCompleted: task.date_completed,
+    status: deriveTaskStatus(task),
+    dateCompleted: deriveTaskStatus(task) === 'Completed' ? task.date_completed : null,
     createdDate: task.created_date || '',
     completionReport: task.completion_report,
   }));
@@ -290,10 +300,10 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
                     <tr key={task.id}>
                       <td>{task.name}</td>
                       <td>{task.project || '-'}</td>
-                      <td>{task.status || '-'}</td>
+                      <td>{deriveTaskStatus(task)}</td>
                       <td>{parseHours(task.hours_spent).toFixed(2)}h</td>
                       <td>{task.created_date || '-'}</td>
-                      <td>{task.date_completed || '-'}</td>
+                      <td>{deriveTaskStatus(task) === 'Completed' ? task.date_completed || '-' : '-'}</td>
                     </tr>
                   ))
                 ) : (

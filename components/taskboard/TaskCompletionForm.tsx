@@ -381,14 +381,16 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
     }
 
     for (const draft of projectTasks) {
+      const normalizedProgress = Math.max(0, Math.min(100, draft.progress || 0));
+      const status: Task['status'] = normalizedProgress >= 100 ? 'Completed' : 'In Progress';
       const finalTask: Task = {
         id: draft.id,
         name: draft.name,
         project: draft.project,
         hoursSpent: draft.totalHours,
         priority: 'Medium',
-        status: 'Completed',
-        dateCompleted: draft.date,
+        status,
+        dateCompleted: status === 'Completed' ? draft.date : null,
         createdDate: getTodayStr(),
         completionReport: {
           output: draft.dynamicNotes["Today's Output"] || '',
@@ -396,7 +398,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
           tomorrow: draft.dynamicNotes["Tomorrow's Plan"] || '',
           link: draft.dynamicNotes['Output Link'] || '',
           dynamicNotes: { ...draft.dynamicNotes },
-          taskProgress: draft.progress,
+          taskProgress: normalizedProgress,
           projectProgress,
           attachments: draft.attachments,
         },

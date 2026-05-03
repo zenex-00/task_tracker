@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -9,10 +8,8 @@ import { useAppStore } from '@/lib/store/useAppStore';
 
 export function TasksTable() {
   const tasks = useAppStore((s) => s.tasks);
-  const advanceTaskStatus = useAppStore((s) => s.advanceTaskStatus);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('All');
-  const statusOrder = ['Not Started', 'In Progress', 'Completed'] as const;
 
   const filtered = useMemo(() => {
     let list = [...tasks].sort((a, b) => new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime());
@@ -80,29 +77,7 @@ export function TasksTable() {
                     <strong>{task.hoursSpent.toFixed(2)}h</strong>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{task.createdDate}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const currentIdx = statusOrder.indexOf(task.status);
-                          const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length];
-                          advanceTaskStatus(task.id);
-                          toast(`Task moved to: ${nextStatus}`);
-                        }}
-                        style={{
-                          background: 'var(--accent-soft)',
-                          color: 'var(--accent)',
-                          fontSize: '0.72rem',
-                          borderRadius: 'var(--radius-pill)',
-                          padding: '3px 8px',
-                          fontWeight: 700,
-                          border: '1px solid rgba(79,70,229,0.2)',
-                        }}
-                      >
-                        Update
-                      </button>
-                    </div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{task.createdDate}</span>
                   </td>
                 </tr>
               ))}

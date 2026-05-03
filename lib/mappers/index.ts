@@ -4,15 +4,26 @@ import { getTodayStr } from '@/lib/utils/date';
 const DEFAULT_PRIORITY: TaskPriority = 'Medium';
 const DEFAULT_STATUS: TaskStatus = 'Not Started';
 
+function deriveStatusFromProgress(progress: number | undefined, fallback: TaskStatus): TaskStatus {
+  if (typeof progress === 'number' && Number.isFinite(progress)) {
+    return progress >= 100 ? 'Completed' : 'In Progress';
+  }
+  return fallback;
+}
+
 export function mapTaskFromDB(row: TaskRow): Task {
+  const fallbackStatus = (row.status as TaskStatus) || DEFAULT_STATUS;
+  const taskProgress =
+    row.completion_report && typeof row.completion_report === 'object' ? row.completion_report.taskProgress : undefined;
+  const status = deriveStatusFromProgress(taskProgress, fallbackStatus);
   return {
     id: row.id,
     name: row.name,
     project: row.project || 'General',
     hoursSpent: parseFloat(String(row.hours_spent)) || 0,
     priority: (row.priority as TaskPriority) || DEFAULT_PRIORITY,
-    status: (row.status as TaskStatus) || DEFAULT_STATUS,
-    dateCompleted: row.date_completed || null,
+    status,
+    dateCompleted: status === 'Completed' ? row.date_completed || null : null,
     createdDate: row.created_date || getTodayStr(),
     completionReport: row.completion_report || null,
   };
