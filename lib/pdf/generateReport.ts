@@ -66,6 +66,12 @@ function pushNote(notes: string[], label: string, value: string): void {
   notes.push(`${cleanLabel}\n${cleanValue}`);
 }
 
+function renderCellProgress(value?: number): string {
+  const bounded = Math.max(0, Math.min(100, Number(value) || 0));
+  const active = Math.round(bounded / 10);
+  return `[${'#'.repeat(active)}${'.'.repeat(10 - active)}]`;
+}
+
 export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const jsPDF = (jsPdfMod as any).default || (jsPdfMod as any).jsPDF;
@@ -214,6 +220,59 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
     cursorY = doc.lastAutoTable.finalY + 8;
   }
 
+  const taskProgressRows = filteredTasks
+    .filter((task) => task.completionReport)
+    .map((task) => ({
+      project: task.project || '-',
+      task: task.name || '-',
+      cells: renderCellProgress(task.completionReport?.taskProgress),
+    }));
+  if (taskProgressRows.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Task Progress Snapshot', margin, cursorY);
+    doc.autoTable({
+      startY: cursorY + 3,
+      head: [['Project', 'Task', 'Progress Cells']],
+      body: taskProgressRows.map((row) => [row.project, row.task, row.cells]),
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+      styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
+      margin: { left: margin, right: margin },
+    });
+    cursorY = doc.lastAutoTable.finalY + 8;
+  }
+
+  const latestProjectProgress = filteredTasks.reduce<Record<string, { createdDate: string; value: number }>>((acc, task) => {
+    const key = task.project || 'General';
+    const value = task.completionReport?.projectProgress;
+    if (typeof value !== 'number') return acc;
+    const marker = task.dateCompleted || task.createdDate || '';
+    const current = acc[key];
+    if (!current || marker >= current.createdDate) {
+      acc[key] = { createdDate: marker, value };
+    }
+    return acc;
+  }, {});
+  const projectProgressRows = Object.entries(latestProjectProgress).map(([project, data]) => [project, renderCellProgress(data.value)]);
+  if (projectProgressRows.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Project Progress Snapshot', margin, cursorY);
+    doc.autoTable({
+      startY: cursorY + 3,
+      head: [['Project', 'Progress Cells']],
+      body: projectProgressRows,
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] },
+      styles: { font: 'helvetica', fontSize: 9, textColor: [15, 23, 42] },
+      margin: { left: margin, right: margin },
+    });
+    cursorY = doc.lastAutoTable.finalY + 8;
+  }
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(15, 23, 42);
@@ -274,17 +333,17 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
         pushNote(notes, 'GitHub Link', report?.link || '');
       }
 
-      return [t.dateCompleted || '-', t.project || '-', t.name || '-', notes.join('\n\n--------------------\n\n') || 'No additional notes'];
+      return [t.dateCompleted || '-', t.project || '-', t.name || '-', renderCellProgress(report?.taskProgress), notes.join('\n\n--------------------\n\n') || 'No additional notes'];
     });
 
     doc.autoTable({
       startY: cursorY + 3,
-      head: [['Date', 'Project', 'Task', 'Delivery Notes']],
+      head: [['Date', 'Project', 'Task', 'Progress', 'Delivery Notes']],
       body: tasksBody,
       theme: 'grid',
       headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255] },
       styles: { font: 'helvetica', fontSize: 8.5, textColor: [15, 23, 42], cellPadding: 2.1, valign: 'top' },
-      columnStyles: { 3: { cellWidth: 88 } },
+      columnStyles: { 3: { cellWidth: 32 }, 4: { cellWidth: 56 } },
       margin: { left: margin, right: margin },
     });
   } else {

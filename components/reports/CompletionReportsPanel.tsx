@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useAppStore } from '@/lib/store/useAppStore';
 import { supabase } from '@/lib/supabase/client';
+import { CellProgressBar } from '@/components/ui/CellProgressBar';
 import type { ReportAttachment } from '@/types';
 
 function formatFileSize(bytes: number): string {
@@ -76,12 +77,24 @@ export function CompletionReportsPanel() {
           {reports.map((task) => {
             const dynamicNotes = Object.entries(task.completionReport?.dynamicNotes || {});
             const attachments = task.completionReport?.attachments || [];
+            const taskProgress = task.completionReport?.taskProgress ?? 0;
+            const projectProgress = task.completionReport?.projectProgress ?? 0;
             return (
               <article key={task.id} className="progress-report-card">
                 <h3>
                   {task.name} <span className="text-muted">({task.project || 'General'})</span>
                 </h3>
                 <p className="text-muted">Completed: {task.dateCompleted || '-'}</p>
+                <div className="report-progress-strip">
+                  <div>
+                    <strong>Task Progress</strong>
+                    <CellProgressBar ariaLabel={`Task progress for ${task.name}`} value={taskProgress} compact />
+                  </div>
+                  <div>
+                    <strong>Project Progress</strong>
+                    <CellProgressBar ariaLabel={`Project progress for ${task.project || 'General'}`} value={projectProgress} compact />
+                  </div>
+                </div>
 
                 {dynamicNotes.length ? (
                   <div className="progress-notes">

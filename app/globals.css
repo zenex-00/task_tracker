@@ -1549,6 +1549,43 @@ tr:last-child td {
   padding: 11px 12px 12px;
 }
 
+.progress-cell-block {
+  margin-top: 14px;
+}
+
+.cell-progress {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cell-progress.is-compact {
+  gap: 4px;
+}
+
+.cell-progress-cell {
+  border: 1px solid rgba(166, 186, 214, 0.6);
+  background: linear-gradient(180deg, rgba(236, 242, 251, 0.9), rgba(219, 230, 245, 0.9));
+  height: 20px;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.cell-progress.is-compact .cell-progress-cell {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.cell-progress-cell.is-active {
+  border-color: rgba(24, 101, 189, 0.7);
+  background: linear-gradient(180deg, #65abff, #1d79e3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.cell-progress-cell.is-interactive {
+  cursor: pointer;
+}
+
 .progress-label-row {
   display: flex;
   align-items: center;
@@ -1669,6 +1706,20 @@ tr:last-child td {
 .progress-report-card h3 {
   margin: 0 0 4px;
   font-size: 1rem;
+}
+
+.report-progress-strip {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.report-progress-strip strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8rem;
+  color: #445872;
 }
 
 .progress-notes {
@@ -1988,6 +2039,14 @@ tr:last-child td {
 
   .progress-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .report-progress-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .cell-progress {
+    gap: 4px;
   }
 
   .admin-users-toolbar .filters {

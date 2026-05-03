@@ -10,6 +10,8 @@ export const completionReportSchema = z.object({
   tomorrow: z.string(),
   link: z.string(),
   dynamicNotes: z.record(z.string(), z.string()),
+  taskProgress: z.number().min(0).max(100).optional(),
+  projectProgress: z.number().min(0).max(100).optional(),
   attachments: z
     .array(
       z.object({

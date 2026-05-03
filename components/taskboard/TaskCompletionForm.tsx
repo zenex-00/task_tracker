@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { HourBreakdownSection } from '@/components/taskboard/HourBreakdownSection';
 import { NoteFieldsSection } from '@/components/taskboard/NoteFieldsSection';
+import { CellProgressBar } from '@/components/ui/CellProgressBar';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { supabase } from '@/lib/supabase/client';
 import { getTodayStr } from '@/lib/utils/date';
@@ -25,6 +26,7 @@ interface StagedTaskDraft {
   totalHours: number;
   entries: TimeEntry[];
   dynamicNotes: Record<string, string>;
+  progress: number;
   attachments: ReportAttachment[];
 }
 
@@ -130,6 +132,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   const [taskName, setTaskName] = useState('');
   const [isProgressStep, setIsProgressStep] = useState(false);
   const [projectProgress, setProjectProgress] = useState(0);
+  const [taskProgress, setTaskProgress] = useState(0);
   const [stagedTasks, setStagedTasks] = useState<StagedTaskDraft[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -191,6 +194,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       if (fileInput) fileInput.value = '';
     });
     setFilesByField({});
+    setTaskProgress(0);
     setEditingTaskId(null);
   };
 
@@ -210,6 +214,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#nf-${idx}`);
       if (field) field.value = draft.dynamicNotes[nf.name] || '';
     });
+    setTaskProgress(draft.progress || 0);
     setFilesByField({});
   };
 
@@ -289,6 +294,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       totalHours,
       entries,
       dynamicNotes,
+      progress: taskProgress,
       attachments,
     };
   };
@@ -371,6 +377,8 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
           tomorrow: draft.dynamicNotes["Tomorrow's Plan"] || '',
           link: draft.dynamicNotes['Output Link'] || '',
           dynamicNotes: { ...draft.dynamicNotes },
+          taskProgress: draft.progress,
+          projectProgress,
           attachments: draft.attachments,
         },
       };
@@ -403,7 +411,6 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
     const totalInvestedHours = projectTasks.reduce((sum, t) => sum + t.totalHours, 0);
     const estimatedRemainingHours = projectProgress > 0 ? (totalInvestedHours * (100 - projectProgress)) / projectProgress : 0;
     const progressTone = projectProgress < 34 ? 'Started' : projectProgress < 80 ? 'In Progress' : 'Near Completion';
-    const progressBg = `linear-gradient(90deg, #0a84ff 0%, #0a84ff ${projectProgress}%, #d9e4f5 ${projectProgress}%, #d9e4f5 100%)`;
     const formatHours = (value: number) => {
       const totalMinutes = Math.max(0, Math.round(value * 60));
       const hours = Math.floor(totalMinutes / 60);
@@ -418,28 +425,15 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
             <h3 className="progress-title">{selectedProject} Progress</h3>
             <p className="progress-subtle-state">{progressTone}</p>
           </div>
-          <span className="progress-pill">{projectProgress}% Done</span>
+          <span className="progress-pill">Cell Tracking</span>
         </div>
-        <div className="progress-slider-block">
+        <div className="progress-slider-block progress-cell-block">
           <div className="progress-label-row">
-            <label htmlFor="project-progress-range" className="progress-label">
+            <label className="progress-label">
               Overall Progress
             </label>
-            <span className="progress-value-chip">{projectProgress}%</span>
           </div>
-          <div className="progress-range-wrap">
-            <input
-              className="progress-range"
-              style={{ background: progressBg }}
-              id="project-progress-range"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={projectProgress}
-              onChange={(e) => setProjectProgress(parseInt(e.target.value, 10) || 0)}
-            />
-          </div>
+          <CellProgressBar ariaLabel="Project progress" value={projectProgress} onChange={setProjectProgress} />
         </div>
         <div className="progress-stages">
           <span>Started</span>
@@ -524,6 +518,12 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
 
       <HourBreakdownSection hourTypes={hourTypes} onManage={onManageHourTypes} />
       <NoteFieldsSection noteFields={noteFields} onManage={onManageNoteFields} />
+      <div className="progress-slider-block progress-cell-block mt-4">
+        <div className="progress-label-row">
+          <label className="progress-label">Task Progress</label>
+        </div>
+        <CellProgressBar ariaLabel="Task progress" value={taskProgress} onChange={setTaskProgress} />
+      </div>
       <div className="attachments-section mt-4">
         <div className="section-subhead">
           <h3>Upload Documents</h3>

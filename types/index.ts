@@ -33,6 +33,8 @@ export interface CompletionReport {
   tomorrow: string;
   link: string;
   dynamicNotes: Record<string, string>;
+  taskProgress?: number;
+  projectProgress?: number;
   attachments?: ReportAttachment[];
 }
 
