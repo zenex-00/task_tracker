@@ -24,8 +24,6 @@ const defaultField: NoteField = {
 
 export function ManageNoteFieldsModal({ isOpen, onClose }: ManageNoteFieldsModalProps) {
   const noteFields = useAppStore((s) => s.noteFields);
-  const addNoteField = useAppStore((s) => s.addNoteField);
-  const removeNoteField = useAppStore((s) => s.removeNoteField);
   const updateNoteFields = useAppStore((s) => s.updateNoteFields);
 
   const [draft, setDraft] = useState<NoteField[]>(noteFields);
@@ -65,8 +63,8 @@ export function ManageNoteFieldsModal({ isOpen, onClose }: ManageNoteFieldsModal
               type="button"
               className="btn-remove-project"
               onClick={() => {
-                removeNoteField(idx);
-                toast(`Field "${nf.name}" removed.`);
+                setDraft((prev) => prev.filter((_, i) => i !== idx));
+                toast(`Field "${nf.name}" removed from draft.`);
               }}
             >
               &times;
@@ -102,9 +100,9 @@ export function ManageNoteFieldsModal({ isOpen, onClose }: ManageNoteFieldsModal
               toast('Label is required.');
               return;
             }
-            addNoteField(newField);
+            setDraft((prev) => [...prev, newField]);
             setNewField(defaultField);
-            toast(`Field "${newField.name}" added.`);
+            toast(`Field "${newField.name}" added to draft.`);
           }}
         >
           Add

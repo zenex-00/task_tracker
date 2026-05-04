@@ -49,6 +49,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 type AppStore = AppState & {
   currentUserId: string | null;
+  canManageSettings: boolean;
   loadAllData: () => Promise<boolean>;
   setSyncStatus: (status: SyncStatus) => void;
   setDataLoaded: (loaded: boolean) => void;
@@ -57,17 +58,9 @@ type AppStore = AppState & {
   deleteTask: (taskId: string) => void;
   upsertEntry: (entry: TimeEntry) => Promise<boolean>;
   deleteEntry: (entryId: string) => void;
-  addProject: (name: string) => void;
-  removeProject: (idx: number) => void;
   updateProjects: (projects: string[]) => void;
-  addHourType: (ht: HourType) => void;
-  removeHourType: (idx: number) => void;
   updateHourTypes: (types: HourType[]) => void;
-  addNoteField: (nf: NoteField) => void;
-  removeNoteField: (idx: number) => void;
   updateNoteFields: (fields: NoteField[]) => void;
-  addUploadField: (field: UploadField) => void;
-  removeUploadField: (idx: number) => void;
   updateUploadFields: (fields: UploadField[]) => void;
   advanceTaskStatus: (taskId: string) => void;
   updateSettings: (settings: AppSettings) => void;
@@ -92,6 +85,7 @@ function writeLocalArray<T>(key: string, value: T[]): void {
 async function syncSettings(get: () => AppStore): Promise<void> {
   const s = get();
   if (!s.isDataLoaded) return;
+  if (!s.canManageSettings) return;
 
   s.setSyncStatus('loading');
   const { error } = await supabase.from('settings').upsert({
@@ -133,6 +127,7 @@ export const useAppStore = create<AppStore>((set, get) => {
   tasks: [],
   timeEntries: [],
   currentUserId: null,
+  canManageSettings: false,
   projects: DEFAULT_PROJECTS,
   assignedProjects: null,
   hourTypes: DEFAULT_HOUR_TYPES,
@@ -162,14 +157,21 @@ export const useAppStore = create<AppStore>((set, get) => {
       const currentUserId = authData.user.id;
 
       const [tasksRes, entriesRes, settingsRes, profileRes] = await Promise.all([
-        supabase.from('tasks').select('*').eq('user_id', currentUserId).order('created_date', { ascending: false }),
-        supabase.from('time_entries').select('*').eq('user_id', currentUserId).order('date', { ascending: false }),
-        supabase.from('settings').select('*').eq('id', 1).single(),
+        supabase
+          .from('tasks')
+          .select('id, user_id, name, project, hours_spent, priority, status, date_completed, created_date, completion_report')
+          .eq('user_id', currentUserId)
+          .order('created_date', { ascending: false }),
+        supabase.from('time_entries').select('id, user_id, date, hours, task_id, billable, project, description').eq('user_id', currentUserId).order('date', { ascending: false }),
+        supabase.from('settings').select('id, weekly_hour_target, monthly_task_target, projects, hour_types, note_fields, upload_fields').eq('id', 1).single(),
         supabase.from('user_profiles').select('is_admin, projects').eq('id', currentUserId).maybeSingle<{ is_admin: boolean; projects: string[] | null }>(),
       ]);
 
       if (tasksRes.error) throw tasksRes.error;
       if (entriesRes.error) throw entriesRes.error;
+      if (settingsRes.error) {
+        throw settingsRes.error;
+      }
 
       const tasks = ((tasksRes.data || []) as unknown as import('@/types').TaskRow[]).map(mapTaskFromDB);
       const timeEntries = ((entriesRes.data || []) as unknown as EntryRow[]).map(mapEntryFromDB);
@@ -179,7 +181,8 @@ export const useAppStore = create<AppStore>((set, get) => {
         weeklyHourTarget: settings?.weekly_hour_target ?? DEFAULT_SETTINGS.weeklyHourTarget,
         monthlyTaskTarget: settings?.monthly_task_target ?? DEFAULT_SETTINGS.monthlyTaskTarget,
       };
-      const assignedProjects = profileRes.error || profileRes.data?.is_admin ? null : (profileRes.data?.projects ?? null);
+      const canManageSettings = !profileRes.error && Boolean(profileRes.data?.is_admin);
+      const assignedProjects = canManageSettings ? null : (profileRes.data?.projects ?? null);
 
       const projects = settings?.projects?.length ? settings.projects : get().projects;
       const hourTypes = settings?.hour_types?.length ? settings.hour_types : get().hourTypes;
@@ -195,6 +198,7 @@ export const useAppStore = create<AppStore>((set, get) => {
         tasks,
         timeEntries,
         currentUserId,
+        canManageSettings,
         settings: nextSettings,
         projects,
         assignedProjects,
@@ -315,49 +319,10 @@ export const useAppStore = create<AppStore>((set, get) => {
     })();
   },
 
-  addProject: (name) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    set((state) => {
-      if (state.projects.includes(trimmed)) return {};
-      const projects = [...state.projects, trimmed];
-      writeLocalArray(PROJECTS_KEY, projects);
-      return { projects };
-    });
-    void syncSettings(get);
-  },
-
-  removeProject: (idx) => {
-    set((state) => {
-      const projects = state.projects.filter((_, i) => i !== idx);
-      writeLocalArray(PROJECTS_KEY, projects);
-      return { projects };
-    });
-    void syncSettings(get);
-  },
-
   updateProjects: (projects) => {
     const clean = projects.map((p) => p.trim()).filter(Boolean);
     set({ projects: clean });
     writeLocalArray(PROJECTS_KEY, clean);
-    void syncSettings(get);
-  },
-
-  addHourType: (ht) => {
-    set((state) => {
-      const hourTypes = [...state.hourTypes, ht];
-      writeLocalArray(HOUR_TYPES_KEY, hourTypes);
-      return { hourTypes };
-    });
-    void syncSettings(get);
-  },
-
-  removeHourType: (idx) => {
-    set((state) => {
-      const hourTypes = state.hourTypes.filter((_, i) => i !== idx);
-      writeLocalArray(HOUR_TYPES_KEY, hourTypes);
-      return { hourTypes };
-    });
     void syncSettings(get);
   },
 
@@ -367,46 +332,10 @@ export const useAppStore = create<AppStore>((set, get) => {
     void syncSettings(get);
   },
 
-  addNoteField: (nf) => {
-    set((state) => {
-      const noteFields = normalizeNoteFields([...state.noteFields, nf]);
-      writeLocalArray(NOTE_FIELDS_KEY, noteFields);
-      return { noteFields };
-    });
-    void syncSettings(get);
-  },
-
-  removeNoteField: (idx) => {
-    set((state) => {
-      const noteFields = state.noteFields.filter((_, i) => i !== idx);
-      writeLocalArray(NOTE_FIELDS_KEY, noteFields);
-      return { noteFields };
-    });
-    void syncSettings(get);
-  },
-
   updateNoteFields: (fields) => {
     const noteFields = normalizeNoteFields(fields);
     set({ noteFields });
     writeLocalArray(NOTE_FIELDS_KEY, noteFields);
-    void syncSettings(get);
-  },
-
-  addUploadField: (field) => {
-    set((state) => {
-      const uploadFields = [...state.uploadFields, field];
-      writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
-      return { uploadFields };
-    });
-    void syncSettings(get);
-  },
-
-  removeUploadField: (idx) => {
-    set((state) => {
-      const uploadFields = state.uploadFields.filter((_, i) => i !== idx);
-      writeLocalArray(UPLOAD_FIELDS_KEY, uploadFields);
-      return { uploadFields };
-    });
     void syncSettings(get);
   },
 

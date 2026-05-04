@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { generateReport } from '@/lib/pdf/generateReport';
 import { useAppStore } from '@/lib/store/useAppStore';
+import { supabase } from '@/lib/supabase/client';
 import type { ReportType } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 
@@ -17,8 +18,29 @@ const cards: Array<{ type: ReportType; title: string; desc: string; cls: string 
 export function PdfReportButtons() {
   const tasks = useAppStore((s) => s.tasks);
   const timeEntries = useAppStore((s) => s.timeEntries);
+  const currentUserId = useAppStore((s) => s.currentUserId);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ type: ReportType; url: string; fileName: string } | null>(null);
+  const [profileName, setProfileName] = useState<string>('Team Member');
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    const loadName = async () => {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name')
+        .eq('id', currentUserId)
+        .maybeSingle<{ first_name: string; last_name: string }>();
+      if (cancelled) return;
+      const fullName = `${data?.first_name || ''} ${data?.last_name || ''}`.trim();
+      if (fullName) setProfileName(fullName);
+    };
+    void loadName();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     return () => {
@@ -46,7 +68,10 @@ export function PdfReportButtons() {
     const key = `${type}-view`;
     try {
       setLoadingKey(key);
-      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks, {
+        clientName: profileName,
+        preparedBy: profileName,
+      });
       const url = URL.createObjectURL(blob);
       setPreview((prev) => {
         if (prev?.url) URL.revokeObjectURL(prev.url);
@@ -64,7 +89,10 @@ export function PdfReportButtons() {
     const key = `${type}-download`;
     try {
       setLoadingKey(key);
-      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks, {
+        clientName: profileName,
+        preparedBy: profileName,
+      });
       const url = URL.createObjectURL(blob);
       downloadBlob(url, fileName);
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);

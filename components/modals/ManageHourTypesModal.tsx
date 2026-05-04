@@ -14,8 +14,6 @@ interface ManageHourTypesModalProps {
 
 export function ManageHourTypesModal({ isOpen, onClose }: ManageHourTypesModalProps) {
   const hourTypes = useAppStore((s) => s.hourTypes);
-  const addHourType = useAppStore((s) => s.addHourType);
-  const removeHourType = useAppStore((s) => s.removeHourType);
   const updateHourTypes = useAppStore((s) => s.updateHourTypes);
 
   const [draft, setDraft] = useState<HourType[]>(hourTypes);
@@ -68,8 +66,8 @@ export function ManageHourTypesModal({ isOpen, onClose }: ManageHourTypesModalPr
               type="button"
               className="btn-remove-project"
               onClick={() => {
-                removeHourType(idx);
-                toast(`Hour type "${ht.code}" removed.`);
+                setDraft((prev) => prev.filter((_, i) => i !== idx));
+                toast(`Hour type "${ht.code}" removed from draft.`);
               }}
             >
               &times;
@@ -102,9 +100,9 @@ export function ManageHourTypesModal({ isOpen, onClose }: ManageHourTypesModalPr
               toast('Enter a code and name.');
               return;
             }
-            addHourType(newHourType);
+            setDraft((prev) => [...prev, newHourType]);
             setNewHourType({ code: '', name: '', maxPercent: '', color: '#4f46e5' });
-            toast(`Hour type "${newHourType.code}" added.`);
+            toast(`Hour type "${newHourType.code}" added to draft.`);
           }}
         >
           Add

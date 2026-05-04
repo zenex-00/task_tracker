@@ -21,8 +21,6 @@ const defaultField: UploadField = {
 
 export function ManageUploadFieldsModal({ isOpen, onClose }: ManageUploadFieldsModalProps) {
   const uploadFields = useAppStore((s) => s.uploadFields);
-  const addUploadField = useAppStore((s) => s.addUploadField);
-  const removeUploadField = useAppStore((s) => s.removeUploadField);
   const updateUploadFields = useAppStore((s) => s.updateUploadFields);
 
   const [draft, setDraft] = useState<UploadField[]>(uploadFields);
@@ -59,8 +57,8 @@ export function ManageUploadFieldsModal({ isOpen, onClose }: ManageUploadFieldsM
               type="button"
               className="btn-remove-project"
               onClick={() => {
-                removeUploadField(idx);
-                toast(`Upload field "${field.name || `#${idx + 1}`}" removed.`);
+                setDraft((prev) => prev.filter((_, i) => i !== idx));
+                toast(`Upload field "${field.name || `#${idx + 1}`}" removed from draft.`);
               }}
             >
               &times;
@@ -92,13 +90,13 @@ export function ManageUploadFieldsModal({ isOpen, onClose }: ManageUploadFieldsM
               toast('Upload field label is required.');
               return;
             }
-            addUploadField({
+            setDraft((prev) => [...prev, {
               ...newField,
               name: newField.name.trim(),
               accept: newField.accept || defaultField.accept,
-            });
+            }]);
             setNewField(defaultField);
-            toast(`Upload field "${newField.name}" added.`);
+            toast(`Upload field "${newField.name}" added to draft.`);
           }}
         >
           Add
@@ -124,4 +122,3 @@ export function ManageUploadFieldsModal({ isOpen, onClose }: ManageUploadFieldsM
     </Modal>
   );
 }
-

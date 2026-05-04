@@ -10,7 +10,7 @@ type CreateUserBody = {
   password?: string;
   firstName?: string;
   lastName?: string;
-  role?: TeamRole;
+  role?: string;
 };
 
 type UpdateUserProjectsBody = {
@@ -126,17 +126,28 @@ export async function POST(request: Request) {
   const password = body.password || '';
   const firstName = body.firstName?.trim() || '';
   const lastName = body.lastName?.trim() || '';
-  const role = body.role;
+  const rawRole = body.role;
   // New users are always created as non-admin users.
   const isAdmin = false;
 
-  if (!email || !password || !firstName || !lastName || !role) {
+  if (!email || !password || !firstName || !lastName || !rawRole) {
     return NextResponse.json({ error: 'All fields are required.' }, { status: 400 });
   }
 
-  if (!role || typeof role !== 'string' || role.trim() === '') {
+  if (typeof rawRole !== 'string' || rawRole.trim() === '') {
     return NextResponse.json({ error: 'A valid role is required.' }, { status: 400 });
   }
+
+  const role = rawRole.trim();
+  if (role.length > 80) {
+    return NextResponse.json({ error: 'Role must be 80 characters or fewer.' }, { status: 400 });
+  }
+
+  if (role === 'Other') {
+    return NextResponse.json({ error: 'Please provide a specific role name instead of "Other".' }, { status: 400 });
+  }
+
+  const normalizedRole: TeamRole = TEAM_ROLES.includes(role as TeamRole) ? (role as TeamRole) : role;
 
   if (password.length < 8) {
     return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 });
@@ -159,7 +170,7 @@ export async function POST(request: Request) {
     user_metadata: {
       first_name: firstName,
       last_name: lastName,
-      job_role: role,
+      job_role: normalizedRole,
     },
   });
 
@@ -172,7 +183,7 @@ export async function POST(request: Request) {
     email,
     first_name: firstName,
     last_name: lastName,
-    job_role: role,
+    job_role: normalizedRole,
     is_admin: isAdmin,
     projects: null,
   };
@@ -186,7 +197,7 @@ export async function POST(request: Request) {
         email,
         first_name: firstName,
         last_name: lastName,
-        job_role: role,
+        job_role: normalizedRole,
         is_admin: isAdmin,
       });
 

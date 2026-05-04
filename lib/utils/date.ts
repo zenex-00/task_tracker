@@ -5,7 +5,8 @@ export function getTodayStr(): string {
 
 export function getWeekAgoStr(): string {
   const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
+  // Inclusive 7-day window [today-6, today]
+  weekAgo.setDate(weekAgo.getDate() - 6);
   return `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
 }
 

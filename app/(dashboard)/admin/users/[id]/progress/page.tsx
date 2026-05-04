@@ -48,6 +48,19 @@ function deriveTaskStatus(task: TaskProgressRow): 'Completed' | 'In Progress' | 
   return 'Not Started';
 }
 
+function getTaskProgress(task: TaskProgressRow): number {
+  const rawProgress = task.completion_report?.taskProgress;
+  const parsed = typeof rawProgress === 'number' ? rawProgress : Number.parseFloat(String(rawProgress ?? 0));
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(100, parsed));
+}
+
+function getProgressBadgeClass(progress: number): string {
+  if (progress > 75) return 'badge-progress-high';
+  if (progress >= 45) return 'badge-progress-mid';
+  return 'badge-progress-low';
+}
+
 async function resolveReportAttachments(adminClient: ReturnType<typeof createAdminClient>, attachments: ReportAttachment[]) {
   if (!attachments.length) return [];
 
@@ -296,16 +309,21 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
               </thead>
               <tbody>
                 {tasks.length ? (
-                  tasks.map((task) => (
-                    <tr key={task.id}>
-                      <td>{task.name}</td>
-                      <td>{task.project || '-'}</td>
-                      <td>{deriveTaskStatus(task)}</td>
-                      <td>{parseHours(task.hours_spent).toFixed(2)}h</td>
-                      <td>{task.created_date || '-'}</td>
-                      <td>{deriveTaskStatus(task) === 'Completed' ? task.date_completed || '-' : '-'}</td>
-                    </tr>
-                  ))
+                  tasks.map((task) => {
+                    const taskProgress = getTaskProgress(task);
+                    return (
+                      <tr key={task.id}>
+                        <td>{task.name}</td>
+                        <td>{task.project || '-'}</td>
+                        <td>{deriveTaskStatus(task)}</td>
+                        <td>{parseHours(task.hours_spent).toFixed(2)}h</td>
+                        <td>{task.created_date || '-'}</td>
+                        <td>
+                          <span className={`badge ${getProgressBadgeClass(taskProgress)}`}>{Math.round(taskProgress)}%</span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={6}>No tasks found.</td>
@@ -324,7 +342,12 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
             </div>
           </div>
           {reports.length ? (
-            <AdminUserSubmittedReports tasks={pdfTasks} timeEntries={pdfEntries} attachments={submittedFiles} />
+            <AdminUserSubmittedReports
+              tasks={pdfTasks}
+              timeEntries={pdfEntries}
+              attachments={submittedFiles}
+              reportUserName={`${userProfile.first_name} ${userProfile.last_name}`.trim() || userProfile.email}
+            />
           ) : (
             <p className="text-muted">No completion reports found.</p>
           )}

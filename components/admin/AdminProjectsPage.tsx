@@ -7,8 +7,6 @@ import { useAppStore } from '@/lib/store/useAppStore';
 
 export function AdminProjectsPage() {
   const projects = useAppStore((s) => s.projects);
-  const addProject = useAppStore((s) => s.addProject);
-  const removeProject = useAppStore((s) => s.removeProject);
   const updateProjects = useAppStore((s) => s.updateProjects);
 
   const [newProject, setNewProject] = useState('');
@@ -24,9 +22,15 @@ export function AdminProjectsPage() {
       toast('Enter a project name first.');
       return;
     }
-    addProject(val);
+    setDraft((prev) => {
+      if (prev.includes(val)) {
+        toast(`Project "${val}" already exists.`);
+        return prev;
+      }
+      return [...prev, val];
+    });
     setNewProject('');
-    toast(`Project "${val}" added.`);
+    toast(`Project "${val}" added to draft.`);
   };
 
   return (
@@ -59,8 +63,8 @@ export function AdminProjectsPage() {
                 <button
                   className="btn-remove-project"
                   onClick={() => {
-                    removeProject(idx);
-                    toast(`Project "${project}" removed.`);
+                    setDraft((prev) => prev.filter((_, i) => i !== idx));
+                    toast(`Project "${project}" removed from draft.`);
                   }}
                   type="button"
                   title="Remove project"

@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body className={outfit.className}>
         <div id="app">{children}</div>
-        <Toaster duration={2800} position="bottom-center" />
+        <Toaster duration={2800} position="bottom-right" />
       </body>
     </html>
   );

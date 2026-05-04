@@ -1,8 +1,6 @@
 require("dotenv").config();
 const { Client } = require("pg");
 
-console.log("DIRECT_URL:", process.env.DIRECT_URL);
-
 const c = new Client({ connectionString: process.env.DIRECT_URL });
 
 console.log("Connecting...");

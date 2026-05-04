@@ -43,32 +43,65 @@ function sanitizeFileName(name: string): string {
 async function uploadAttachments(files: File[], userId: string, date: string, fieldName: string): Promise<ReportAttachment[]> {
   const uploaded: ReportAttachment[] = [];
 
-  for (const file of files) {
-    const safeName = sanitizeFileName(file.name);
-    const path = `${userId}/${date}/${generateId()}_${safeName}`;
-    const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(path, file, {
-      upsert: false,
-      contentType: file.type || undefined,
-    });
+  try {
+    for (const file of files) {
+      const safeName = sanitizeFileName(file.name);
+      const path = `${userId}/${date}/${generateId()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(path, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      });
 
-    if (uploadError) {
-      throw new Error(uploadError.message || `Failed to upload "${file.name}"`);
+      if (uploadError) {
+        throw new Error(uploadError.message || `Failed to upload "${file.name}"`);
+      }
+
+      uploaded.push({
+        fieldName,
+        name: file.name,
+        path,
+        bucket: ATTACHMENT_BUCKET,
+        mimeType: file.type || 'application/octet-stream',
+        size: file.size,
+        uploadedAt: new Date().toISOString(),
+      });
     }
-
-    const { data: publicData } = supabase.storage.from(ATTACHMENT_BUCKET).getPublicUrl(path);
-    uploaded.push({
-      fieldName,
-      name: file.name,
-      path,
-      bucket: ATTACHMENT_BUCKET,
-      mimeType: file.type || 'application/octet-stream',
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-      publicUrl: publicData.publicUrl || undefined,
-    });
+  } catch (error) {
+    await Promise.all(
+      uploaded.map(async (attachment) => {
+        await supabase.storage.from(attachment.bucket).remove([attachment.path]);
+      }),
+    );
+    throw error;
   }
 
   return uploaded;
+}
+
+async function deleteUploadedAttachments(attachments: ReportAttachment[]): Promise<void> {
+  if (!attachments.length) return;
+  const byBucket = attachments.reduce<Record<string, string[]>>((acc, attachment) => {
+    if (!acc[attachment.bucket]) acc[attachment.bucket] = [];
+    acc[attachment.bucket].push(attachment.path);
+    return acc;
+  }, {});
+  await Promise.all(Object.entries(byBucket).map(async ([bucket, paths]) => supabase.storage.from(bucket).remove(paths)));
+}
+
+async function rollbackDraftPersistence(taskId: string, userId: string): Promise<boolean> {
+  const { error: entryDeleteError } = await supabase.from('time_entries').delete().eq('task_id', taskId).eq('user_id', userId);
+  if (entryDeleteError) {
+    console.error('Failed to rollback time entries for task:', taskId, entryDeleteError);
+    return false;
+  }
+
+  const { error: taskDeleteError } = await supabase.from('tasks').delete().eq('id', taskId).eq('user_id', userId);
+  if (taskDeleteError) {
+    console.error('Failed to rollback task:', taskId, taskDeleteError);
+    return false;
+  }
+
+  return true;
 }
 
 function matchesAccept(file: File, accept: string): boolean {
@@ -125,6 +158,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
   const currentUserId = useAppStore((s) => s.currentUserId);
   const upsertTask = useAppStore((s) => s.upsertTask);
   const upsertEntry = useAppStore((s) => s.upsertEntry);
+  const deleteTask = useAppStore((s) => s.deleteTask);
 
   const [filesByField, setFilesByField] = useState<Record<string, File[]>>({});
   const [dragOverFieldId, setDragOverFieldId] = useState<string | null>(null);
@@ -328,6 +362,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
     setStagedTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === draft.id);
       if (idx === -1) return [...prev, draft];
+      void deleteUploadedAttachments(prev[idx].attachments || []);
       const next = [...prev];
       next[idx] = draft;
       return next;
@@ -347,6 +382,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
     setStagedTasks((prev) => {
       const idx = prev.findIndex((t) => t.id === draft.id);
       if (idx === -1) return [...prev, draft];
+      void deleteUploadedAttachments(prev[idx].attachments || []);
       const next = [...prev];
       next[idx] = draft;
       return next;
@@ -391,7 +427,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
         priority: 'Medium',
         status,
         dateCompleted: status === 'Completed' ? draft.date : null,
-        createdDate: getTodayStr(),
+        createdDate: draft.date,
         completionReport: {
           output: draft.dynamicNotes["Today's Output"] || '',
           blockers: draft.dynamicNotes.Blockers || '',
@@ -406,6 +442,7 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
 
       const taskOk = await upsertTask(finalTask);
       if (!taskOk) {
+        await deleteUploadedAttachments(draft.attachments);
         toast(`Failed to save task "${draft.name}". Submission stopped.`);
         return;
       }
@@ -413,7 +450,17 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
       for (const entry of draft.entries) {
         const entryOk = await upsertEntry(entry);
         if (!entryOk) {
-          toast(`Failed to save time entry for "${draft.name}". Submission stopped.`);
+          let rolledBack = false;
+          if (currentUserId) {
+            rolledBack = await rollbackDraftPersistence(draft.id, currentUserId);
+          }
+          if (rolledBack) {
+            deleteTask(draft.id);
+            await deleteUploadedAttachments(draft.attachments);
+            toast(`Failed to save time entry for "${draft.name}". Changes were rolled back.`);
+          } else {
+            toast(`Failed to save time entry for "${draft.name}". Submission stopped without attachment cleanup to avoid broken references.`);
+          }
           return;
         }
       }

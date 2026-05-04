@@ -934,6 +934,21 @@ tr:last-child td {
   color: #5c6778;
 }
 
+.badge-progress-high {
+  background: rgba(14, 143, 100, 0.14);
+  color: #0a7654;
+}
+
+.badge-progress-mid {
+  background: rgba(31, 110, 212, 0.14);
+  color: #1f5ec6;
+}
+
+.badge-progress-low {
+  background: rgba(184, 121, 27, 0.14);
+  color: #8f5b0f;
+}
+
 .metric-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

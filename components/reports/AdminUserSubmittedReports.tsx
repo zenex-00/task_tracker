@@ -22,6 +22,7 @@ type Props = {
   tasks: Task[];
   timeEntries: TimeEntry[];
   attachments: SubmittedAttachment[];
+  reportUserName: string;
 };
 
 const cards: Array<{ type: ReportType; title: string; desc: string; cls: string }> = [
@@ -42,7 +43,7 @@ function formatFileSize(bytes?: number): string {
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
-export function AdminUserSubmittedReports({ tasks, timeEntries, attachments }: Props) {
+export function AdminUserSubmittedReports({ tasks, timeEntries, attachments, reportUserName }: Props) {
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ type: ReportType; url: string; fileName: string } | null>(null);
 
@@ -89,7 +90,10 @@ export function AdminUserSubmittedReports({ tasks, timeEntries, attachments }: P
     const key = `${type}-view`;
     try {
       setLoadingKey(key);
-      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks, {
+        clientName: reportUserName,
+        preparedBy: reportUserName,
+      });
       const url = URL.createObjectURL(blob);
       setPreview((prev) => {
         if (prev?.url) URL.revokeObjectURL(prev.url);
@@ -107,7 +111,10 @@ export function AdminUserSubmittedReports({ tasks, timeEntries, attachments }: P
     const key = `${type}-download`;
     try {
       setLoadingKey(key);
-      const { blob, fileName } = await generateReport(type, timeEntries, tasks);
+      const { blob, fileName } = await generateReport(type, timeEntries, tasks, {
+        clientName: reportUserName,
+        preparedBy: reportUserName,
+      });
       const url = URL.createObjectURL(blob);
       downloadBlob(url, fileName);
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);

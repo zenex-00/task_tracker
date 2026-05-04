@@ -13,8 +13,6 @@ interface ManageProjectsModalProps {
 
 export function ManageProjectsModal({ isOpen, onClose }: ManageProjectsModalProps) {
   const projects = useAppStore((s) => s.projects);
-  const addProject = useAppStore((s) => s.addProject);
-  const removeProject = useAppStore((s) => s.removeProject);
   const updateProjects = useAppStore((s) => s.updateProjects);
 
   const [newProject, setNewProject] = useState('');
@@ -43,12 +41,12 @@ export function ManageProjectsModal({ isOpen, onClose }: ManageProjectsModalProp
                 }}
                 placeholder="Project name"
               />
-              <button
-                className="btn-remove-project"
-                onClick={() => {
-                  removeProject(idx);
-                  toast(`Project "${project}" removed.`);
-                }}
+                <button
+                  className="btn-remove-project"
+                  onClick={() => {
+                  setDraft((prev) => prev.filter((_, i) => i !== idx));
+                  toast(`Project "${project}" removed from draft.`);
+                  }}
                 type="button"
                 title="Remove project"
               >
@@ -74,9 +72,15 @@ export function ManageProjectsModal({ isOpen, onClose }: ManageProjectsModalProp
               toast('Enter a project name first.');
               return;
             }
-            addProject(val);
+            setDraft((prev) => {
+              if (prev.includes(val)) {
+                toast(`Project "${val}" already exists.`);
+                return prev;
+              }
+              return [...prev, val];
+            });
             setNewProject('');
-            toast(`Project "${val}" added.`);
+            toast(`Project "${val}" added to draft.`);
           }}
         />
         <button
@@ -88,9 +92,15 @@ export function ManageProjectsModal({ isOpen, onClose }: ManageProjectsModalProp
               toast('Enter a project name first.');
               return;
             }
-            addProject(val);
+            setDraft((prev) => {
+              if (prev.includes(val)) {
+                toast(`Project "${val}" already exists.`);
+                return prev;
+              }
+              return [...prev, val];
+            });
             setNewProject('');
-            toast(`Project "${val}" added.`);
+            toast(`Project "${val}" added to draft.`);
           }}
         >
           Add

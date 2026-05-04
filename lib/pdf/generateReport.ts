@@ -40,6 +40,11 @@ export interface GeneratedReportPdf {
   fileName: string;
 }
 
+export interface ReportIdentity {
+  clientName: string;
+  preparedBy: string;
+}
+
 function normalizeLabel(label: string): string {
   const raw = String(label || '').trim();
   const lower = raw.toLowerCase();
@@ -118,7 +123,12 @@ function hasCompletionReportContent(report: Task['completionReport']): boolean {
   if ((report.attachments || []).length > 0) return true;
   return false;
 }
-export async function generateReport(type: ReportType, timeEntries: TimeEntry[], tasks: Task[]): Promise<GeneratedReportPdf> {
+export async function generateReport(
+  type: ReportType,
+  timeEntries: TimeEntry[],
+  tasks: Task[],
+  identity?: Partial<ReportIdentity>,
+): Promise<GeneratedReportPdf> {
   const [jsPdfMod, autoTableMod] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
   const jsPDF = (jsPdfMod as any).default || (jsPdfMod as any).jsPDF;
 
@@ -135,8 +145,8 @@ export async function generateReport(type: ReportType, timeEntries: TimeEntry[],
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 14;
   const today = getTodayStr();
-  const clientName = 'Monzer';
-  const freelancerName = 'Abdul Rehman';
+  const clientName = identity?.clientName?.trim() || 'Client';
+  const freelancerName = identity?.preparedBy?.trim() || 'Team Member';
 
   let reportLabel = 'Performance Report';
   let periodLabel = 'All Time';
