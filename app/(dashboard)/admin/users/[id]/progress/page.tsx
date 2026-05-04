@@ -41,6 +41,20 @@ function parseHours(value: number | string | null | undefined): number {
   return Number.parseFloat(String(value ?? 0)) || 0;
 }
 
+function parseEntryDate(value: string): Date | null {
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getStartOfWeek(date: Date): Date {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day; // Monday as start of week
+  start.setDate(start.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 function deriveTaskStatus(task: TaskProgressRow): 'Completed' | 'In Progress' | 'Not Started' {
   const progress = task.completion_report?.taskProgress;
   if (typeof progress === 'number' && Number.isFinite(progress)) {
@@ -122,7 +136,13 @@ async function resolveReportAttachments(adminClient: ReturnType<typeof createAdm
   }));
 }
 
-export default async function AdminUserProgressPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminUserProgressPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ focus?: string }>;
+}) {
   const currentUser = await getCurrentUserWithProfile();
 
   if (!currentUser) {
@@ -152,6 +172,9 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
     );
   }
   const { id: userId } = await params;
+  const { focus } = await searchParams;
+  const selectedFocus: 'daily' | 'weekly' | 'monthly' =
+    focus === 'daily' || focus === 'weekly' || focus === 'monthly' ? focus : 'daily';
 
   const { data: userProfile, error: userError } = await adminClient
     .from('user_profiles')
@@ -197,6 +220,32 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
   const entries = (entriesData || []) as TimeEntryProgressRow[];
 
   const totalHours = entries.reduce((sum, entry) => sum + parseHours(entry.hours), 0);
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfWeek = getStartOfWeek(now);
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const dailyHours = entries.reduce((sum, entry) => {
+    const entryDate = parseEntryDate(entry.date);
+    if (!entryDate) return sum;
+    return entryDate >= startOfToday ? sum + parseHours(entry.hours) : sum;
+  }, 0);
+
+  const weeklyHours = entries.reduce((sum, entry) => {
+    const entryDate = parseEntryDate(entry.date);
+    if (!entryDate) return sum;
+    return entryDate >= startOfWeek ? sum + parseHours(entry.hours) : sum;
+  }, 0);
+
+  const monthlyHours = entries.reduce((sum, entry) => {
+    const entryDate = parseEntryDate(entry.date);
+    if (!entryDate) return sum;
+    return entryDate >= startOfMonth ? sum + parseHours(entry.hours) : sum;
+  }, 0);
+  const focusHours = selectedFocus === 'daily' ? dailyHours : selectedFocus === 'weekly' ? weeklyHours : monthlyHours;
+  const focusLabel = selectedFocus === 'daily' ? 'Today' : selectedFocus === 'weekly' ? 'This Week' : 'This Month';
+
   const completedTasks = tasks.filter((task) => deriveTaskStatus(task) === 'Completed').length;
   const reports = tasks.filter((task) => task.completion_report);
   const reportsWithAttachments = await Promise.all(
@@ -254,6 +303,17 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
           <p className="section-subtitle">
             {userProfile.email} | {userProfile.job_role}
           </p>
+          <div className="time-period-switch">
+            <Link href={`/admin/users/${userId}/progress?focus=daily`} className={`time-filter-pill ${selectedFocus === 'daily' ? 'is-active' : ''}`}>
+              Daily
+            </Link>
+            <Link href={`/admin/users/${userId}/progress?focus=weekly`} className={`time-filter-pill ${selectedFocus === 'weekly' ? 'is-active' : ''}`}>
+              Weekly
+            </Link>
+            <Link href={`/admin/users/${userId}/progress?focus=monthly`} className={`time-filter-pill ${selectedFocus === 'monthly' ? 'is-active' : ''}`}>
+              Monthly
+            </Link>
+          </div>
         </div>
         <Link href="/admin/users" className="btn-secondary btn-sm">
           Back To Users
@@ -272,8 +332,8 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
           <span className="mc-label">Total Hours</span>
         </article>
         <article className="metric-card">
-          <span className="mc-value">{entries.length}</span>
-          <span className="mc-label">Time Entries</span>
+          <span className="mc-value">{focusHours.toFixed(2)}h</span>
+          <span className="mc-label">{focusLabel}</span>
         </article>
         <article className="metric-card">
           <span className="mc-value">{tasks.length}</span>
