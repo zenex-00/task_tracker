@@ -7,12 +7,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 type TaskRow = {
   user_id: string | null;
+  name: string;
   project: string | null;
+  hours_spent: number | string | null;
   status: string | null;
   completion_report?: {
     taskProgress?: number;
   } | null;
 };
+type MergedTaskRow = TaskRow & { mergedHoursSpent: number };
 
 type EntryRow = {
   user_id: string | null;
@@ -42,6 +45,38 @@ function isCompleted(task: TaskRow): boolean {
   return task.status === 'Completed';
 }
 
+function normalizeTaskKeyValue(value: string | null | undefined): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function mergeTaskRows(rows: TaskRow[]): MergedTaskRow[] {
+  const merged = new Map<string, MergedTaskRow>();
+
+  for (const row of rows) {
+    const key = `${row.user_id || 'unknown'}::${normalizeProject(row.project)}::${normalizeTaskKeyValue(row.name)}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...row, mergedHoursSpent: parseHours(row.hours_spent) });
+      continue;
+    }
+
+    const nextHours = existing.mergedHoursSpent + parseHours(row.hours_spent);
+    const existingProgress = existing.completion_report?.taskProgress ?? -1;
+    const rowProgress = row.completion_report?.taskProgress ?? -1;
+    if (rowProgress >= existingProgress) {
+      merged.set(key, { ...row, mergedHoursSpent: nextHours });
+    } else {
+      existing.mergedHoursSpent = nextHours;
+      merged.set(key, existing);
+    }
+  }
+
+  return [...merged.values()];
+}
+
 function dateDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
@@ -64,12 +99,12 @@ export default async function AnalyticsPage() {
     }
 
     const [tasksRes, entriesRes, usersRes] = await Promise.all([
-      adminClient.from('tasks').select('user_id, project, status, completion_report'),
+      adminClient.from('tasks').select('user_id, name, project, hours_spent, status, completion_report'),
       adminClient.from('time_entries').select('user_id, project, hours, date'),
       adminClient.from('user_profiles').select('id, first_name, last_name'),
     ]);
 
-    const tasks = (tasksRes.data || []) as TaskRow[];
+    const tasks = mergeTaskRows((tasksRes.data || []) as TaskRow[]);
     const entries = (entriesRes.data || []) as EntryRow[];
     const users = (usersRes.data || []) as UserRow[];
 

@@ -6,12 +6,16 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 type TaskRow = {
   user_id: string | null;
+  name: string;
   project: string | null;
   hours_spent: number | string | null;
   status: string | null;
   completion_report?: {
     taskProgress?: number;
   } | null;
+};
+type MergedTaskRow = TaskRow & {
+  mergedHoursSpent: number;
 };
 
 type TimeEntryRow = {
@@ -61,6 +65,38 @@ function isTaskCompleted(task: TaskRow): boolean {
   return task.status === 'Completed';
 }
 
+function normalizeTaskKeyValue(value: string | null | undefined): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function mergeTaskRows(rows: TaskRow[]): MergedTaskRow[] {
+  const merged = new Map<string, MergedTaskRow>();
+
+  for (const row of rows) {
+    const key = `${row.user_id || 'unknown'}::${normalizeProject(row.project)}::${normalizeTaskKeyValue(row.name)}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...row, mergedHoursSpent: parseHours(row.hours_spent) });
+      continue;
+    }
+
+    const nextHours = existing.mergedHoursSpent + parseHours(row.hours_spent);
+    const existingProgress = existing.completion_report?.taskProgress ?? -1;
+    const rowProgress = row.completion_report?.taskProgress ?? -1;
+    if (rowProgress >= existingProgress) {
+      merged.set(key, { ...row, mergedHoursSpent: nextHours });
+    } else {
+      existing.mergedHoursSpent = nextHours;
+      merged.set(key, existing);
+    }
+  }
+
+  return [...merged.values()];
+}
+
 export default async function AdminTeamPage({
   searchParams,
 }: {
@@ -97,7 +133,7 @@ export default async function AdminTeamPage({
 
   const { data: taskRows, error: taskError } = await adminClient
     .from('tasks')
-    .select('user_id, project, hours_spent, status, completion_report');
+    .select('user_id, name, project, hours_spent, status, completion_report');
 
   const { data: entryRows, error: entryError } = await adminClient
     .from('time_entries')
@@ -130,7 +166,7 @@ export default async function AdminTeamPage({
     );
   }
 
-  const tasks = (taskRows || []) as TaskRow[];
+  const tasks = mergeTaskRows((taskRows || []) as TaskRow[]);
   const entries = (entryRows || []) as TimeEntryRow[];
   const users = (usersRows || []) as UserProfileRow[];
 
@@ -149,7 +185,6 @@ export default async function AdminTeamPage({
     };
 
     current.totalTasks += 1;
-    current.totalHours += parseHours(task.hours_spent);
     if (isTaskCompleted(task)) current.completedTasks += 1;
     if (task.user_id) current.users.add(task.user_id);
     projectMap.set(project, current);
@@ -322,7 +357,7 @@ export default async function AdminTeamPage({
                   <th>Entries</th>
                   <th>Tasks</th>
                   <th>Completed</th>
-                  <th>Action</th>
+                  <th className="member-action-col">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -335,8 +370,8 @@ export default async function AdminTeamPage({
                       <td>{member.entries}</td>
                       <td>{member.tasks}</td>
                       <td>{member.completedTasks}</td>
-                      <td>
-                        <Link href={`/admin/users/${member.userId}/progress`} className="btn-secondary btn-sm">
+                      <td className="member-action-cell">
+                        <Link href={`/admin/users/${member.userId}/progress`} className="btn-secondary btn-sm member-progress-link">
                           View Progress
                         </Link>
                       </td>

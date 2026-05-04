@@ -919,6 +919,24 @@ tr:last-child td {
   border-bottom: 0;
 }
 
+.member-action-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.member-action-cell {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.member-progress-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: 114px;
+}
+
 .badge-completed {
   background: rgba(14, 143, 100, 0.14);
   color: #0a7654;

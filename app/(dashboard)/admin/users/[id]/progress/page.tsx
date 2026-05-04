@@ -33,6 +33,9 @@ type UserProfileRow = {
   job_role: string;
   is_admin: boolean;
 };
+type MergedTaskProgressRow = TaskProgressRow & {
+  mergedHoursSpent: number;
+};
 
 function parseHours(value: number | string | null | undefined): number {
   return Number.parseFloat(String(value ?? 0)) || 0;
@@ -59,6 +62,38 @@ function getProgressBadgeClass(progress: number): string {
   if (progress > 75) return 'badge-progress-high';
   if (progress >= 45) return 'badge-progress-mid';
   return 'badge-progress-low';
+}
+
+function normalizeTaskKeyValue(value: string | null | undefined): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function mergeTaskRows(rows: TaskProgressRow[]): MergedTaskProgressRow[] {
+  const merged = new Map<string, MergedTaskProgressRow>();
+
+  for (const row of rows) {
+    const key = `${normalizeTaskKeyValue(row.project)}::${normalizeTaskKeyValue(row.name)}`;
+    const existing = merged.get(key);
+    const rowMarker = row.created_date || row.date_completed || '';
+
+    if (!existing) {
+      merged.set(key, { ...row, mergedHoursSpent: parseHours(row.hours_spent) });
+      continue;
+    }
+
+    existing.mergedHoursSpent += parseHours(row.hours_spent);
+    const existingMarker = existing.created_date || existing.date_completed || '';
+    if (rowMarker >= existingMarker) {
+      merged.set(key, { ...row, mergedHoursSpent: existing.mergedHoursSpent });
+    } else {
+      merged.set(key, existing);
+    }
+  }
+
+  return [...merged.values()].sort((a, b) => (b.created_date || '').localeCompare(a.created_date || ''));
 }
 
 async function resolveReportAttachments(adminClient: ReturnType<typeof createAdminClient>, attachments: ReportAttachment[]) {
@@ -158,7 +193,7 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
       : '';
   const queryErrorMessage = tasksError?.message || entriesError?.message || scopeErrorMessage;
 
-  const tasks = (tasksData || []) as TaskProgressRow[];
+  const tasks = mergeTaskRows((tasksData || []) as TaskProgressRow[]);
   const entries = (entriesData || []) as TimeEntryProgressRow[];
 
   const totalHours = entries.reduce((sum, entry) => sum + parseHours(entry.hours), 0);
@@ -176,7 +211,7 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
     id: task.id,
     name: task.name,
     project: task.project || 'General',
-    hoursSpent: parseHours(task.hours_spent),
+    hoursSpent: task.mergedHoursSpent,
     priority: 'Medium',
     status: deriveTaskStatus(task),
     dateCompleted: deriveTaskStatus(task) === 'Completed' ? task.date_completed : null,
@@ -316,7 +351,7 @@ export default async function AdminUserProgressPage({ params }: { params: Promis
                         <td>{task.name}</td>
                         <td>{task.project || '-'}</td>
                         <td>{deriveTaskStatus(task)}</td>
-                        <td>{parseHours(task.hours_spent).toFixed(2)}h</td>
+                      <td>{task.mergedHoursSpent.toFixed(2)}h</td>
                         <td>{task.created_date || '-'}</td>
                         <td>
                           <span className={`badge ${getProgressBadgeClass(taskProgress)}`}>{Math.round(taskProgress)}%</span>

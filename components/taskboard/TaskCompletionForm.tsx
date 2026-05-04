@@ -567,11 +567,15 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
             onChange={(e) => {
               const id = e.target.value;
               setSelectedExistingTaskId(id);
-              if (!id) return;
+              if (!id) {
+                setEditingTaskId(null);
+                return;
+              }
               const selected = existingTasksForProject.find((item) => item.id === id);
               if (!selected) return;
               setTaskName(selected.name);
               setTaskProgress(selected.progress);
+              setEditingTaskId(selected.id);
             }}
             style={{ marginBottom: '8px' }}
           >
@@ -589,7 +593,10 @@ export function TaskCompletionForm({ onManageHourTypes, onManageNoteFields, onMa
             value={taskName}
             onChange={(e) => {
               setTaskName(e.target.value);
-              if (selectedExistingTaskId) setSelectedExistingTaskId('');
+              if (selectedExistingTaskId) {
+                setSelectedExistingTaskId('');
+                setEditingTaskId(null);
+              }
             }}
             placeholder="Enter task name"
             required
