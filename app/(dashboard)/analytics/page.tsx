@@ -184,7 +184,6 @@ export default async function AnalyticsPage() {
         inProgress: project.inProgress,
         tasks: project.tasks,
         members: project.users.size,
-        completedPct: project.tasks > 0 ? (project.completed / project.tasks) * 100 : 0,
       }))
       .sort((a, b) => b.hours - a.hours);
     const members = [...memberMap.values()].sort((a, b) => b.hours - a.hours);
@@ -197,7 +196,6 @@ export default async function AnalyticsPage() {
         completed: member.completed,
         inProgress: member.inProgress,
         tasks: taskCount,
-        completedPct: taskCount > 0 ? (member.completed / taskCount) * 100 : 0,
       };
     });
 
@@ -233,11 +231,6 @@ export default async function AnalyticsPage() {
     ).size;
 
     const totalInProgress = projects.reduce((sum, p) => sum + p.inProgress, 0);
-    const totalCompletedPct =
-      projects.reduce((sum, p) => sum + p.tasks, 0) > 0
-        ? (projects.reduce((sum, p) => sum + p.completed, 0) / projects.reduce((sum, p) => sum + p.tasks, 0)) * 100
-        : 0;
-
     const totals = {
       projects: projects.length,
       hours: projects.reduce((sum, p) => sum + p.hours, 0),
@@ -247,7 +240,6 @@ export default async function AnalyticsPage() {
       weekHours: currentWeekHours,
       previousWeekHours,
       inProgress: totalInProgress,
-      completedPct: totalCompletedPct,
     };
 
     return <AdminAnalyticsScreen projects={projects} members={membersDetailed} totals={totals} trend={trend} />;

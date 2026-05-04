@@ -9,7 +9,6 @@ type ProjectMetric = {
   inProgress: number;
   tasks: number;
   members: number;
-  completedPct: number;
 };
 
 type MemberMetric = {
@@ -20,7 +19,7 @@ type MemberMetric = {
 
 interface AdminAnalyticsScreenProps {
   projects: ProjectMetric[];
-  members: Array<MemberMetric & { inProgress: number; tasks: number; completedPct: number }>;
+  members: Array<MemberMetric & { inProgress: number; tasks: number }>;
   totals: {
     hours: number;
     completed: number;
@@ -30,7 +29,6 @@ interface AdminAnalyticsScreenProps {
     activeUsers: number;
     weekHours: number;
     previousWeekHours: number;
-    completedPct: number;
   };
   trend: Array<{ date: string; label: string; hours: number }>;
 }
@@ -85,10 +83,6 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
         <article className="metric-card">
           <span className="mc-value">{totals.inProgress}</span>
           <span className="mc-label">In Progress Tasks</span>
-        </article>
-        <article className="metric-card">
-          <span className="mc-value">{totals.completedPct.toFixed(1)}%</span>
-          <span className="mc-label">% Completed</span>
         </article>
       </div>
 
@@ -165,7 +159,6 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                   <th>Tasks</th>
                   <th>In Progress</th>
                   <th>Completed</th>
-                  <th>% Completed</th>
                   <th>Members</th>
                 </tr>
               </thead>
@@ -178,13 +171,12 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                       <td>{project.tasks}</td>
                       <td>{project.inProgress}</td>
                       <td>{project.completed}</td>
-                      <td>{project.completedPct.toFixed(1)}%</td>
                       <td>{project.members}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7}>No project data found.</td>
+                    <td colSpan={6}>No project data found.</td>
                   </tr>
                 )}
               </tbody>
@@ -203,7 +195,6 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                   <th>Tasks</th>
                   <th>In Progress</th>
                   <th>Completed</th>
-                  <th>% Completed</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,12 +206,11 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                       <td>{member.tasks}</td>
                       <td>{member.inProgress}</td>
                       <td>{member.completed}</td>
-                      <td>{member.completedPct.toFixed(1)}%</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>No member data found.</td>
+                    <td colSpan={5}>No member data found.</td>
                   </tr>
                 )}
               </tbody>
