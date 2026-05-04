@@ -6,9 +6,10 @@ type ProjectMetric = {
   project: string;
   hours: number;
   completed: number;
+  inProgress: number;
   tasks: number;
   members: number;
-  completionRate: number;
+  completedPct: number;
 };
 
 type MemberMetric = {
@@ -19,16 +20,17 @@ type MemberMetric = {
 
 interface AdminAnalyticsScreenProps {
   projects: ProjectMetric[];
-  members: Array<MemberMetric & { tasks: number; completionRate: number }>;
+  members: Array<MemberMetric & { inProgress: number; tasks: number; completedPct: number }>;
   totals: {
     hours: number;
     completed: number;
+    inProgress: number;
     tasks: number;
     projects: number;
     activeUsers: number;
     weekHours: number;
     previousWeekHours: number;
-    completionRate: number;
+    completedPct: number;
   };
   trend: Array<{ date: string; label: string; hours: number }>;
 }
@@ -81,8 +83,12 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
           <span className="mc-label">7d Growth</span>
         </article>
         <article className="metric-card">
-          <span className="mc-value">{totals.completionRate.toFixed(1)}%</span>
-          <span className="mc-label">Task Completion Rate</span>
+          <span className="mc-value">{totals.inProgress}</span>
+          <span className="mc-label">In Progress Tasks</span>
+        </article>
+        <article className="metric-card">
+          <span className="mc-value">{totals.completedPct.toFixed(1)}%</span>
+          <span className="mc-label">% Completed</span>
         </article>
       </div>
 
@@ -157,8 +163,9 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                   <th>Project</th>
                   <th>Hours</th>
                   <th>Tasks</th>
+                  <th>In Progress</th>
                   <th>Completed</th>
-                  <th>Completion Rate</th>
+                  <th>% Completed</th>
                   <th>Members</th>
                 </tr>
               </thead>
@@ -169,14 +176,15 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                       <td>{project.project}</td>
                       <td>{project.hours.toFixed(2)}h</td>
                       <td>{project.tasks}</td>
+                      <td>{project.inProgress}</td>
                       <td>{project.completed}</td>
-                      <td>{project.completionRate.toFixed(1)}%</td>
+                      <td>{project.completedPct.toFixed(1)}%</td>
                       <td>{project.members}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>No project data found.</td>
+                    <td colSpan={7}>No project data found.</td>
                   </tr>
                 )}
               </tbody>
@@ -193,8 +201,9 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                   <th>Member</th>
                   <th>Hours</th>
                   <th>Tasks</th>
+                  <th>In Progress</th>
                   <th>Completed</th>
-                  <th>Completion Rate</th>
+                  <th>% Completed</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,13 +213,14 @@ export function AdminAnalyticsScreen({ projects, members, totals, trend }: Admin
                       <td>{member.name}</td>
                       <td>{member.hours.toFixed(2)}h</td>
                       <td>{member.tasks}</td>
+                      <td>{member.inProgress}</td>
                       <td>{member.completed}</td>
-                      <td>{member.completionRate.toFixed(1)}%</td>
+                      <td>{member.completedPct.toFixed(1)}%</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5}>No member data found.</td>
+                    <td colSpan={6}>No member data found.</td>
                   </tr>
                 )}
               </tbody>

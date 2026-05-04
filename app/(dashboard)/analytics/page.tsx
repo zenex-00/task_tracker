@@ -45,6 +45,11 @@ function isCompleted(task: TaskRow): boolean {
   return task.status === 'Completed';
 }
 
+function isInProgress(task: TaskRow): boolean {
+  if (isCompleted(task)) return false;
+  return task.status === 'In Progress';
+}
+
 function normalizeTaskKeyValue(value: string | null | undefined): string {
   return String(value || '')
     .trim()
@@ -112,25 +117,26 @@ export default async function AnalyticsPage() {
       users.map((user) => [user.id, `${user.first_name} ${user.last_name}`.trim() || 'Unknown User']),
     );
 
-    const projectMap = new Map<string, { project: string; hours: number; completed: number; tasks: number; users: Set<string> }>();
+    const projectMap = new Map<string, { project: string; hours: number; completed: number; inProgress: number; tasks: number; users: Set<string> }>();
     for (const task of tasks) {
       const project = normalizeProject(task.project);
-      const current = projectMap.get(project) || { project, hours: 0, completed: 0, tasks: 0, users: new Set<string>() };
+      const current = projectMap.get(project) || { project, hours: 0, completed: 0, inProgress: 0, tasks: 0, users: new Set<string>() };
       current.tasks += 1;
       if (isCompleted(task)) current.completed += 1;
+      if (isInProgress(task)) current.inProgress += 1;
       if (task.user_id) current.users.add(task.user_id);
       projectMap.set(project, current);
     }
 
     for (const entry of entries) {
       const project = normalizeProject(entry.project);
-      const current = projectMap.get(project) || { project, hours: 0, completed: 0, tasks: 0, users: new Set<string>() };
+      const current = projectMap.get(project) || { project, hours: 0, completed: 0, inProgress: 0, tasks: 0, users: new Set<string>() };
       current.hours += parseHours(entry.hours);
       if (entry.user_id) current.users.add(entry.user_id);
       projectMap.set(project, current);
     }
 
-    const memberMap = new Map<string, { userId: string; name: string; hours: number; completed: number }>();
+    const memberMap = new Map<string, { userId: string; name: string; hours: number; completed: number; inProgress: number }>();
     for (const entry of entries) {
       if (!entry.user_id) continue;
       const current = memberMap.get(entry.user_id) || {
@@ -138,6 +144,7 @@ export default async function AnalyticsPage() {
         name: namesByUserId.get(entry.user_id) || 'Unknown User',
         hours: 0,
         completed: 0,
+        inProgress: 0,
       };
       current.hours += parseHours(entry.hours);
       memberMap.set(entry.user_id, current);
@@ -150,8 +157,22 @@ export default async function AnalyticsPage() {
         name: namesByUserId.get(task.user_id) || 'Unknown User',
         hours: 0,
         completed: 0,
+        inProgress: 0,
       };
       current.completed += 1;
+      memberMap.set(task.user_id, current);
+    }
+
+    for (const task of tasks) {
+      if (!task.user_id || !isInProgress(task)) continue;
+      const current = memberMap.get(task.user_id) || {
+        userId: task.user_id,
+        name: namesByUserId.get(task.user_id) || 'Unknown User',
+        hours: 0,
+        completed: 0,
+        inProgress: 0,
+      };
+      current.inProgress += 1;
       memberMap.set(task.user_id, current);
     }
 
@@ -160,9 +181,10 @@ export default async function AnalyticsPage() {
         project: project.project,
         hours: project.hours,
         completed: project.completed,
+        inProgress: project.inProgress,
         tasks: project.tasks,
         members: project.users.size,
-        completionRate: project.tasks > 0 ? (project.completed / project.tasks) * 100 : 0,
+        completedPct: project.tasks > 0 ? (project.completed / project.tasks) * 100 : 0,
       }))
       .sort((a, b) => b.hours - a.hours);
     const members = [...memberMap.values()].sort((a, b) => b.hours - a.hours);
@@ -173,8 +195,9 @@ export default async function AnalyticsPage() {
         name: member.name,
         hours: member.hours,
         completed: member.completed,
+        inProgress: member.inProgress,
         tasks: taskCount,
-        completionRate: taskCount > 0 ? (member.completed / taskCount) * 100 : 0,
+        completedPct: taskCount > 0 ? (member.completed / taskCount) * 100 : 0,
       };
     });
 
@@ -209,8 +232,9 @@ export default async function AnalyticsPage() {
       entries.filter((entry) => entry.date && entry.date >= last7 && entry.user_id).map((entry) => entry.user_id as string),
     ).size;
 
-    const currentCompletionRate =
-      projects.reduce((sum, p) => sum + p.completed, 0) > 0 && projects.reduce((sum, p) => sum + p.tasks, 0) > 0
+    const totalInProgress = projects.reduce((sum, p) => sum + p.inProgress, 0);
+    const totalCompletedPct =
+      projects.reduce((sum, p) => sum + p.tasks, 0) > 0
         ? (projects.reduce((sum, p) => sum + p.completed, 0) / projects.reduce((sum, p) => sum + p.tasks, 0)) * 100
         : 0;
 
@@ -222,7 +246,8 @@ export default async function AnalyticsPage() {
       activeUsers: activeUsers7Days,
       weekHours: currentWeekHours,
       previousWeekHours,
-      completionRate: currentCompletionRate,
+      inProgress: totalInProgress,
+      completedPct: totalCompletedPct,
     };
 
     return <AdminAnalyticsScreen projects={projects} members={membersDetailed} totals={totals} trend={trend} />;
